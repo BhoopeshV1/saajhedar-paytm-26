@@ -680,7 +680,7 @@ div.pill { padding-right: 8px; }
   .sheet::-webkit-scrollbar, .call-talk::-webkit-scrollbar { display: none; }
 
   /* Phone frame */
-  :root[data-layout="phone"] .shell, .shell.welcome-shell, .shell.customer {
+  :root[data-layout="phone"] .shell, .shell.customer {
     width: 402px; max-width: 402px; height: 874px; zoom: var(--fit-phone, 1); border-radius: 54px;
     box-shadow: 0 0 0 3px #2C3344, 0 0 0 12px #0A0E18, 0 0 0 13.5px #4A5368, 0 40px 80px -24px rgba(0, 8, 36, .85);
     &::before { content: ""; position: fixed; z-index: 70; top: 11px; left: 50%; transform: translateX(-50%); width: 112px; height: 31px; border-radius: 20px; background: #05070C; pointer-events: none; }
@@ -704,16 +704,20 @@ div.pill { padding-right: 8px; }
   }
 
   /* Side keys of the phone frame: action, volume up, volume down on the left; power on the right */
-  :root[data-layout="phone"] .device-keys, body:has(.welcome-shell, .customer) .device-keys { display: block; position: fixed; top: 50%; left: 50%; width: 436px; height: 874px; translate: -50% -50%; zoom: var(--fit-phone, 1); pointer-events: none; }
+  :root[data-layout="phone"] .device-keys, body:has(.customer) .device-keys { display: block; position: fixed; top: 50%; left: 50%; width: 436px; height: 874px; translate: -50% -50%; zoom: var(--fit-phone, 1); pointer-events: none; }
   .device-keys i { position: absolute; width: 6px; border-radius: 3px 0 0 3px; background: linear-gradient(90deg, #8C98B4 0, #4A5670 40%, #1B2233 100%); left: 0; }
   .device-keys i:nth-child(1) { top: 138px; height: 30px; }
   .device-keys i:nth-child(2) { top: 196px; height: 58px; }
   .device-keys i:nth-child(3) { top: 268px; height: 58px; }
   .device-keys i:nth-child(4) { left: auto; right: 0; top: 232px; height: 92px; border-radius: 0 3px 3px 0; background: linear-gradient(270deg, #8C98B4 0, #4A5670 40%, #1B2233 100%); }
 
+  /* Welcome and setup in the tablet frame: a phone-width column in the middle */
+  :root:not([data-layout="phone"]) .shell.welcome-shell { padding-left: 0; }
+  :root:not([data-layout="phone"]) .shell.welcome-shell > :first-child { width: 100%; max-width: 480px; margin: 0 auto; padding-top: 28px; }
+
   /* Tablet frame */
-  :root:not([data-layout="phone"]) body:has(.shell:not(.welcome-shell):not(.customer))::before { content: ""; position: fixed; z-index: 70; top: calc(50dvh - 368px * var(--fit-tab, 1)); left: 50%; transform: translateX(-50%); zoom: var(--fit-tab, 1); width: 7px; height: 7px; border-radius: 50%; background: #2A3348; box-shadow: 0 0 0 1.5px #161C2A; }
-  :root:not([data-layout="phone"]) .shell:not(.welcome-shell):not(.customer) {
+  :root:not([data-layout="phone"]) body:has(.shell:not(.customer))::before { content: ""; position: fixed; z-index: 70; top: calc(50dvh - 368px * var(--fit-tab, 1)); left: 50%; transform: translateX(-50%); zoom: var(--fit-tab, 1); width: 7px; height: 7px; border-radius: 50%; background: #2A3348; box-shadow: 0 0 0 1.5px #161C2A; }
+  :root:not([data-layout="phone"]) .shell:not(.customer) {
     width: 1024px; max-width: none; height: 716px; zoom: var(--fit-tab, 1); border-radius: 26px; padding-left: 224px;
     box-shadow: 0 0 0 2px #2C3344, 0 0 0 15px #0A0E18, 0 0 0 16.5px #4A5368, 0 40px 80px -24px rgba(0, 8, 36, .85);
     > main { padding-bottom: 36px; }
