@@ -24,7 +24,7 @@ function Locality({ value, onPick, L }: { value: AreaHit | null; onPick: (h: Are
   if (value) return <div className="picks"><button className="pick on" onClick={() => onPick(null)}>{value.label} ✕</button></div>;
   return (<>
     <input className="field" placeholder={L("Area or street, e.g. Tambaram", "பகுதி அல்லது தெரு, எ.கா. தாம்பரம்", "इलाका या गली, जैसे तांबरम")} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Area or street" />
-    {hits.length > 0 && <div className="hits">{hits.slice(0, 5).map((h) => <button key={h.label + h.lat} onClick={() => { onPick(h); setQ(""); setHits([]); }}>{h.label} <span className="muted">{h.type === "street" ? L("street", "தெரு", "गली") : ""}</span></button>)}</div>}
+    {hits.length > 0 && <div className="hits hits-below">{hits.slice(0, 5).map((h) => <button key={h.label + h.lat} onClick={() => { onPick(h); setQ(""); setHits([]); }}>{h.label} <span className="muted">{h.type === "street" ? L("street", "தெரு", "गली") : ""}</span></button>)}</div>}
   </>);
 }
 
