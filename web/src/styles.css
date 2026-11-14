@@ -600,11 +600,16 @@ div.pill { padding-right: 8px; }
     .bottomnav { height: calc(var(--nav-h) + 14px); padding-bottom: 14px; }
     .toasts { top: 112px; }
     .lang-seg { display: none; }
-    .lang-drop { display: inline-flex; align-items: center; gap: 5px; position: fixed; z-index: 40; top: 11px; left: 257px; right: 21px; width: fit-content; margin-inline: auto; height: 31px; padding: 0 12px; border-radius: 999px; cursor: pointer;
-      font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--navy); background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.35)); border: 1px solid rgba(255,255,255,.9);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 4px 14px -6px rgba(0, 41, 112, .45); backdrop-filter: blur(10px) saturate(1.4); }
-    .lang-drop-dark { color: #fff; background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.08)); border-color: rgba(255,255,255,.32); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 6px 16px -8px rgba(0, 8, 36, .8); }
-    .lang-drop select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; font-size: 14px; }
+    .lang-drop { display: block; position: fixed; z-index: 40; top: 11px; left: 257px; right: 21px; width: fit-content; margin-inline: auto; --ink: var(--navy);
+      --glass: linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.5)); --edge: rgba(255,255,255,.95); --lift: 0 6px 18px -8px rgba(0, 41, 112, .5); }
+    .lang-drop-dark { --ink: #fff; --glass: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.08)); --edge: rgba(255,255,255,.32); --lift: 0 8px 20px -8px rgba(0, 8, 36, .85); }
+    .lang-pill { display: inline-flex; align-items: center; gap: 5px; height: 31px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--ink);
+      background: var(--glass); border: 1px solid var(--edge); box-shadow: inset 0 1px 0 rgba(255,255,255,.5), var(--lift); backdrop-filter: blur(10px) saturate(1.4); }
+    .lang-menu { position: absolute; top: 39px; right: -6px; min-width: 148px; padding: 6px; border-radius: 18px; background: var(--glass); border: 1px solid var(--edge);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.5), var(--lift); backdrop-filter: blur(18px) saturate(1.5); animation: fade .14s ease-out; }
+    .lang-menu button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--ink); }
+    .lang-menu button:hover, .lang-menu button[aria-selected="true"] { background: rgba(255,255,255,.22); }
+    .lang-drop:not(.lang-drop-dark) .lang-menu button:hover, .lang-drop:not(.lang-drop-dark) .lang-menu button[aria-selected="true"] { background: rgba(0, 41, 112, .08); }
   }
 
   /* Tablet frame */

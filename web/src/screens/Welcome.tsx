@@ -1,7 +1,7 @@
 // First run. Two doors: an owner links their shop, or someone who has not
 // opened one yet checks what a locality is missing before spending anything.
 // The phone check and merchant lookup are simulated; nothing reaches Paytm.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../store";
 import { api, inr, type AreaHit, type Fit, type FitKind, type KindLite, type Lang } from "../api";
 import { IconCheck, IconChevron } from "../icons";
@@ -33,12 +33,31 @@ function Locality({ value, onPick, L }: { value: AreaHit | null; onPick: (h: Are
 // Laptop phone frame only: a compact language picker beside the camera cut-out.
 function LangDrop({ dark }: { dark: boolean }) {
   const { lang, setLang } = useApp();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: Event) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", away); document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
   return (
-    <label className={`lang-drop ${dark ? "lang-drop-dark" : ""}`}>
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18" /></svg>
-      <span>{lang.slice(0, 2).toUpperCase()}</span>
-      <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value as typeof lang)}>{LANGS.map(([l, n]) => <option key={l} value={l}>{n}</option>)}</select>
-    </label>
+    <div ref={box} className={`lang-drop ${dark ? "lang-drop-dark" : ""}`}>
+      <button className="lang-pill" aria-haspopup="listbox" aria-expanded={open} aria-label="Language" onClick={() => setOpen(!open)}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18" /></svg>
+        <span>{lang.slice(0, 2).toUpperCase()}</span>
+      </button>
+      {open && (
+        <ul className="lang-menu" role="listbox">
+          {LANGS.map(([l, n]) => (
+            <li key={l}><button role="option" aria-selected={lang === l} onClick={() => { setLang(l); setOpen(false); }}>
+              <span>{n}</span>{lang === l && <IconCheck size={15} />}
+            </button></li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
