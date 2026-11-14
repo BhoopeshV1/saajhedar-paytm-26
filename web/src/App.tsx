@@ -11,8 +11,10 @@ const seen = () => { try { return localStorage.getItem("thunai_setup") != null; 
 // Laptop screens only: switch between the wide layout and a phone-width one.
 function LayoutToggle() {
   const [mode, setMode] = useState<"wide" | "phone">(() => { try { return localStorage.getItem("saajhedar.layout") === "phone" ? "phone" : "wide"; } catch { return "wide"; } });
-  const [wall, setWall] = useState(() => document.documentElement.dataset.wall === "logo");
-  useEffect(() => { if (wall) document.documentElement.dataset.wall = "logo"; else delete document.documentElement.dataset.wall; try { localStorage.setItem("saajhedar.wall", wall ? "logo" : "plain"); } catch {} }, [wall]);
+  // Background behind the device: plain gradient, logo wallpaper, or doodles.
+  const WALLS = ["plain", "logo", "doodle"] as const;
+  const [wall, setWall] = useState<(typeof WALLS)[number]>(() => { const w = document.documentElement.dataset.wall; return w === "logo" || w === "doodle" ? w : "plain"; });
+  useEffect(() => { if (wall === "plain") delete document.documentElement.dataset.wall; else document.documentElement.dataset.wall = wall; try { localStorage.setItem("saajhedar.wall", wall); } catch {} }, [wall]);
   useEffect(() => { document.documentElement.dataset.layout = mode; try { localStorage.setItem("saajhedar.layout", mode); } catch {} }, [mode]);
   const ico = (d: string) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
   return (
@@ -20,7 +22,7 @@ function LayoutToggle() {
       <button aria-pressed={mode === "wide"} aria-label="Wide view" title="Wide view" onClick={() => setMode("wide")}>{ico("M3 5h18v11H3zM8 20h8M12 16v4")}</button>
       <button aria-pressed={mode === "phone"} aria-label="Phone view" title="Phone view" onClick={() => setMode("phone")}>{ico("M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2")}</button>
       <span className="layout-sep" />
-      <button aria-pressed={wall} aria-label="Patterned background" title="Patterned background" onClick={() => setWall(!wall)}>{ico("M4 4h7v7H4zM13 13h7v7h-7zM13 4h7v7h-7zM4 13h7v7H4z")}</button>
+      <button aria-pressed={wall !== "plain"} aria-label={`Background: ${wall}. Change it`} title="Change the background" onClick={() => setWall(WALLS[(WALLS.indexOf(wall) + 1) % WALLS.length])}>{ico("M4 4h7v7H4zM13 13h7v7h-7zM13 4h7v7h-7zM4 13h7v7H4z")}</button>
     </div>
   );
 }

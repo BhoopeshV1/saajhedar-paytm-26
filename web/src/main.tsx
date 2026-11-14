@@ -19,7 +19,7 @@ function fitDevice() {
   r.setProperty("--fit-tab", String(Math.min(1.25, w / 1058, h / 750)));
 }
 fitDevice(); addEventListener("resize", fitDevice);
-try { if (localStorage.getItem("saajhedar.wall") === "logo") document.documentElement.dataset.wall = "logo"; if (localStorage.getItem("saajhedar.layout") === "phone") document.documentElement.dataset.layout = "phone"; } catch {}
+try { { const w = localStorage.getItem("saajhedar.wall"); if (w === "logo" || w === "doodle") document.documentElement.dataset.wall = w; } if (localStorage.getItem("saajhedar.layout") === "phone") document.documentElement.dataset.layout = "phone"; } catch {}
 
 // Sheets unmount the moment they close. To let them slide away, a lifeless copy
 // of a removed sheet is put back for the length of the closing animation.

@@ -638,6 +638,8 @@ div.pill { padding-right: 8px; }
   body { overflow: hidden; height: 100dvh; display: grid; place-items: center; }
   /* Wallpaper behind the device: the hackathon host's logo in outline, laid like bricks */
   :root[data-wall="logo"] body::after { content: ""; position: fixed; z-index: -1; inset: -30%; pointer-events: none; background: url("/wall.png") 0 0 / 190px 110px repeat; opacity: .11; transform: rotate(-9deg); }
+  /* A second wallpaper: shop and payment doodles, packed close */
+  :root[data-wall="doodle"] body::after { content: ""; position: fixed; z-index: -1; inset: -30%; pointer-events: none; background: url("/doodle.svg") 0 0 / 264px 264px repeat; opacity: .16; transform: rotate(-9deg); }
   #root { display: contents; }
   .layout-toggle { display: inline-flex; position: fixed; bottom: 14px; right: 14px; z-index: 80; padding: 4px; gap: 2px; border-radius: 999px; background: rgba(255,255,255,.14); backdrop-filter: blur(8px); }
   .layout-toggle button { width: 44px; height: 36px; border-radius: 999px; display: grid; place-items: center; color: #CFE3FF; }
