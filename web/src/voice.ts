@@ -46,6 +46,9 @@ export class VoiceEngine {
   private belowMs = 0;
   private capturing = false;
   private holdToTalk = false;
+  private frames = 0;
+  private peak = 0;
+  private micTimer = 0;
 
   private queue: AudioBuffer[] = [];
   private playing: AudioBufferSourceNode | null = null;
@@ -83,12 +86,18 @@ export class VoiceEngine {
         await ctx.audioWorklet.addModule(url);
         URL.revokeObjectURL(url);
         const src = ctx.createMediaStreamSource(this.stream);
-        this.node = new AudioWorkletNode(ctx, "tap", { numberOfInputs: 1, numberOfOutputs: 0 });
+        this.node = new AudioWorkletNode(ctx, "tap", { numberOfInputs: 1, numberOfOutputs: 1 });
         this.node.port.onmessage = (e) => this.onFrame(e.data as Float32Array, ctx.sampleRate);
         src.connect(this.node);
+        // Some browsers (Safari) only run nodes that lead to the speakers, so the tap
+        // is wired to the output through a silent gain.
+        const mute = ctx.createGain(); mute.gain.value = 0;
+        this.node.connect(mute); mute.connect(ctx.destination);
       }
       this.resetCapture();
+      this.frames = 0; this.peak = 0;
       this.set("listening");
+      this.watchMic();
     } catch (err: any) {
       const denied = err?.name === "NotAllowedError" || err?.name === "SecurityError";
       this.h.onError(denied ? "Microphone access was blocked. Allow it in the browser settings, or type instead." : err?.message || "Could not start the microphone.");
@@ -96,8 +105,21 @@ export class VoiceEngine {
     }
   }
 
+  // Says so when the microphone is open but nothing is coming through, instead of
+  // sitting on "Listening" for ever.
+  private watchMic() {
+    clearTimeout(this.micTimer);
+    this.micTimer = window.setTimeout(() => {
+      if (!this.stream || this.state === "off") return;
+      const track = this.stream.getAudioTracks()[0];
+      if (this.frames === 0) this.h.onError("The microphone is open but no sound is reaching the app. Reload the page, or type instead.");
+      else if (this.peak < 0.003) this.h.onError(`The microphone${track?.label ? ` (${track.label})` : ""} is silent. Check that it is not muted and that the browser is using the right one, or type instead.`);
+    }, 6000);
+  }
+
   // Ends the conversation and releases the microphone.
   stop() {
+    clearTimeout(this.micTimer);
     this.stopSpeaking();
     this.stream?.getTracks().forEach((t) => t.stop());
     this.node?.disconnect();
@@ -114,16 +136,18 @@ export class VoiceEngine {
   private resetCapture() { this.cur = []; this.curLen = 0; this.pre = []; this.preLen = 0; this.aboveMs = 0; this.belowMs = 0; this.capturing = false; }
 
   private onFrame(frame: Float32Array, rate: number) {
+    this.frames++;
     if (this.state !== "listening" && this.state !== "hearing") return;
     let sum = 0;
     for (let i = 0; i < frame.length; i++) sum += frame[i] * frame[i];
     const rms = Math.sqrt(sum / frame.length);
     const ms = (frame.length / rate) * 1000;
+    if (rms > this.peak) this.peak = rms;
     this.h.onLevel(Math.min(1, rms * 9));
 
     if (this.holdToTalk) { this.cur.push(frame); this.curLen += frame.length; if ((this.curLen / rate) * 1000 > MAX_MS) this.pressEnd(); return; }
 
-    const threshold = Math.max(0.014, this.noise * 3.2);
+    const threshold = Math.max(0.01, this.noise * 3);
     const loud = rms > threshold;
     if (!this.capturing) {
       if (!loud) this.noise = this.noise * 0.96 + rms * 0.04;      // track the room

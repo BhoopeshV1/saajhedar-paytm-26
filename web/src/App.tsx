@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppProvider, useApp } from "./store";
-import { AssistantBar, BottomNav, Menu, PinSheet, Toasts } from "./components/Chrome";
+import { AssistantBar, BottomNav, Menu, PinSheet, Toasts, Waiting } from "./components/Chrome";
 import { Home } from "./screens/Home";
 import { Sell, Stock, Pay, Collect, Rules } from "./screens/Jobs";
 import { Area } from "./screens/Area";
@@ -64,6 +64,7 @@ function Shell() {
     <div className="shell">
       <AssistantBar onMenu={() => setMenu(true)} />
       <main key={screen}>
+        {screen !== "home" && screen !== "area" && <Waiting />}
         {screen === "home" && <Home />}
         {screen === "sell" && <Sell />}
         {screen === "stock" && <Stock />}
