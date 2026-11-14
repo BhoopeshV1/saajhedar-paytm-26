@@ -67,12 +67,15 @@ export function BottomNav() {
   };
   return (
     <nav className="bottomnav">
+      <span className="rail-brand">Saajhedar</span>
+      <span className="rail-only">{tab("home" as Screen)}</span>
       {TABS.slice(0, 2).map(tab)}
-      <button className={`talk talk-${voice}`} onClick={toggleVoice} aria-label={voice === "off" ? "Talk to Thunai" : "Stop listening"}>
+      <button className={`talk talk-${voice}`} onClick={toggleVoice} aria-label={voice === "off" ? "Talk to Saajhedar" : "Stop listening"}>
         <Orb size={68} interactive />
         <span className="talk-glyph">{voice === "off" ? <IconMic /> : null}</span>
       </button>
       {TABS.slice(2).map(tab)}
+      <span className="rail-only">{tab("rules" as Screen)}{tab("area" as Screen)}</span>
     </nav>
   );
 }

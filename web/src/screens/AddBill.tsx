@@ -38,7 +38,7 @@ export function AddBill() {
   };
   const onScan = (r: ScanResult) => {
     setScan(r); setFocus({ bill_id: r.bill_id });
-    // If the owner is in a voice session, Thunai says what it found.
+    // If the owner is in a voice session, Saajhedar says what it found.
     if (voice !== "off") tellAssistant(`The owner photographed a supplier bill and it was read. ${r.supplier}, bill ${r.ref}: billed ${r.billed_amount} rupees, ${r.correct_amount} rupees matches the delivery count.${r.problems.length ? ` Problems: ${r.problems.map((p) => `${p.item} billed ${p.billed}, received ${p.received}`).join("; ")}.` : " It matches the delivery."}${r.new_supplier ? " This is a supplier never paid before." : ""} Bill id ${r.bill_id}. Tell the owner what you found and offer to pay the correct amount.`);
   };
   const photo = (f: File | null) => run(L("Reading the bill", "பில்லைப் படிக்கிறேன்", "बिल पढ़ रहा हूँ"), async () => api.scanBill(f ? await shrink(f) : null), onScan);

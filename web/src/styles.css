@@ -541,3 +541,68 @@ div.pill { padding-right: 8px; }
 @keyframes b-drift { 0%, 100% { translate: 0 0; rotate: -4deg; } 50% { translate: 0 -8px; rotate: 5deg; } }
 @keyframes b-slide { 0%, 100% { translate: -3% 2%; } 33% { translate: 4% -3%; } 66% { translate: 1% 4%; } }
 @media (prefers-reduced-motion: reduce) { .soap, .soap i { animation: none; } }
+.splash-go { position: absolute; left: 24px; right: 24px; bottom: calc(32px + env(safe-area-inset-bottom)); max-width: 432px; margin: 0 auto; background: var(--cyan); color: #00224F; animation: splash-up .7s .9s both; }
+@media (prefers-reduced-motion: reduce) { .splash-go { animation: none; } }
+.splash-made { position: absolute; left: 24px; right: 24px; bottom: calc(100px + env(safe-area-inset-bottom)); text-align: center; font-size: 13px; line-height: 1.5; color: #B7C9EA; animation: splash-up .7s .9s both; }
+@media (prefers-reduced-motion: reduce) { .splash-made { animation: none; } }
+.splash-lang { position: absolute; top: calc(18px + env(safe-area-inset-top)); right: 18px; background: rgba(255,255,255,.14); box-shadow: none; }
+.splash-lang .seg-btn { color: #C9DAF5; }
+.splash-lang .seg-btn.on { background: #fff; color: var(--navy); }
+
+/* Rules at the top of each job */
+.rulestrip { background: linear-gradient(135deg, var(--navy) 0, #04358A 100%); color: #fff; border-radius: 20px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.rulestrip-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; color: #fff; text-align: left; }
+.rulestrip-count { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.rulestrip-count svg { transition: transform .18s; }
+.rulestrip[data-open="true"] .rulestrip-count svg { transform: rotate(90deg); }
+.rulestrip-all { align-self: flex-start; }
+.rulestrip-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; color: #8FDCF8; }
+.rulestrip-all { display: inline-flex; align-items: center; gap: 4px; color: #fff; font-size: 13px; font-weight: 600; padding: 6px 0; }
+.rulestrip-rule { font-size: 15.5px; font-weight: 600; line-height: 1.4; }
+.rulestrip-rule + .rulestrip-rule { border-top: 1px solid rgba(255,255,255,.16); padding-top: 8px; }
+.rulestrip-none { font-size: 14.5px; color: #C9DAF5; }
+.rulestrip-say { text-align: left; font-size: 13px; line-height: 1.4; color: #C9DAF5; background: rgba(255,255,255,.1); border-radius: 12px; padding: 9px 12px; }
+/* Phone orders */
+.calls { margin-top: 12px; }
+.calls li { padding: 10px 0; border-top: 1px solid var(--line); }
+.call-head { width: 100%; text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.call-head .row-detail { grid-column: 1 / -1; }
+.call-body { background: #F4F8FC; border-radius: 14px; padding: 10px 12px; margin: 8px 0 4px; display: flex; flex-direction: column; gap: 8px; }
+.turn { font-size: 14px; line-height: 1.45; color: var(--ink); }
+.turn b { display: block; font-size: 12px; color: var(--muted); font-weight: 700; }
+.turn-saajhedar b { color: var(--cyan-deep); }
+.rail-brand, .rail-only, .layout-toggle { display: none; }
+
+/* ---------- Laptop and desktop ---------- */
+@media (min-width: 960px) {
+  body { background: radial-gradient(900px 600px at 85% -5%, rgba(0,185,241,.55) 0, rgba(0,185,241,0) 62%), radial-gradient(700px 520px at 5% 105%, rgba(40,120,255,.5) 0, rgba(40,120,255,0) 60%), linear-gradient(155deg, #001B52 0, #002970 38%, #0A4DB0 100%) fixed; min-height: 100dvh; }
+  .layout-toggle { display: inline-flex; position: fixed; top: 24px; right: 24px; z-index: 60; padding: 4px; gap: 2px; border-radius: 999px; background: rgba(255,255,255,.14); backdrop-filter: blur(8px); }
+  .layout-toggle button { width: 40px; height: 36px; border-radius: 999px; display: grid; place-items: center; color: #CFE3FF; }
+  .layout-toggle button[aria-pressed="true"] { background: #fff; color: var(--navy); }
+  :root[data-layout="phone"] .shell { box-shadow: 0 30px 80px -30px rgba(0, 10, 40, .7); }
+  :root:not([data-layout="phone"]) {
+    body { overflow: hidden; }
+    .shell { max-width: 1200px; margin: 24px auto; height: calc(100dvh - 48px); min-height: 0; overflow-y: auto; scrollbar-width: thin; border-radius: 30px; padding: 0 0 36px 248px; box-shadow: 0 30px 80px -30px rgba(0, 10, 40, .7); }
+    .shell.welcome-shell, .shell.customer { max-width: 520px; padding-left: 0; }
+    .topbar { border-radius: 0 30px 0 0; padding: 18px 28px 14px; }
+    .topbar .pill, .topbar div.pill { max-width: 620px; }
+    .screen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 18px; padding: 6px 28px 0; }
+    .screen > .title, .screen > .lead-text, .screen > .rulestrip, .screen > .search, .screen > .area-bar, .screen > .map-card, .screen > .verdict, .screen > .empty, .screen > .hello, .screen > header, .screen > .section { grid-column: 1 / -1; }
+    .bottomnav { left: max(24px, calc(50% - 600px)); top: 24px; bottom: 24px; transform: none; width: 232px; max-width: none; height: auto; padding: 22px 14px; display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+      border-radius: 30px 0 0 30px; background: #fff; box-shadow: 1px 0 0 var(--line); }
+    .rail-brand { display: block; font-size: 24px; font-weight: 780; letter-spacing: -.03em; color: var(--navy); padding: 4px 12px 14px; }
+    .rail-only { display: contents; }
+    .tab { flex-direction: row; justify-content: flex-start; gap: 14px; padding: 11px 12px; border-radius: 14px; }
+    .tab-label { font-size: 15px; max-width: none; }
+    .tab-on { background: #EAF6FD; }
+    .tab-on::after { display: none; }
+    .tab-badge { top: -6px; right: -10px; }
+    .talk { order: 99; margin: auto auto 6px; align-self: center; box-shadow: none; }
+    .sheet-scrim { align-items: center; }
+    .sheet { border-radius: 28px; max-width: 520px; }
+    .sheet-grip { display: none; }
+    .toasts { left: auto; right: max(40px, calc(50% - 580px)); transform: none; top: 100px; }
+    .splash { background: radial-gradient(900px 600px at 50% 36%, #0B4AA8 0, var(--navy) 55%, #001A4D 100%); }
+    .splash-go { max-width: 360px; }
+  }
+}

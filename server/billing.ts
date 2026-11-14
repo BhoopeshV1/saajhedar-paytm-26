@@ -142,7 +142,7 @@ export function parseBillFile(name: string, bytes: Uint8Array, fallback: "purcha
 
 // What the app can take bill data from today, stated plainly for the UI.
 export const SOURCES = [
-  { key: "photo", name: "Photo of a paper bill", how: "Point the camera at the bill. Thunai reads it.", works: true, needs: "claude" },
+  { key: "photo", name: "Photo of a paper bill", how: "Point the camera at the bill. Saajhedar reads it.", works: true, needs: "claude" },
   { key: "tally", name: "Tally", how: "Export vouchers as XML and pick the file.", works: true },
   { key: "sheet", name: "Vyapar, myBillBook, Zoho Books and other billing apps", how: "Export the sales or purchase report as Excel or CSV and pick the file.", works: true },
   { key: "live", name: "Automatic sync with a billing app", how: "Not built yet. Each app needs its own agreement and connector.", works: false },

@@ -3,9 +3,9 @@
 import { all, get, run, log, nowIso, today, addDays, daysBetween, db } from "./db";
 import { restockPlan, standingOrderHealth, upcomingFestival, outlook } from "./forecast";
 import { currentWeather } from "./weather";
-import { writeReminders, type Debtor } from "./writer";
+import { writeReminders, writeCall, type Debtor } from "./writer";
 import type { BillDoc } from "./billing";
-import { judgePayment, judgeCredit, validateRule, activeRules, trippedGuards, RULE_KINDS, type RuleKind } from "./rules";
+import { judgeOrder, judgePayment, judgeCredit, validateRule, activeRules, trippedGuards, RULE_KINDS, type RuleKind } from "./rules";
 import { emit } from "./bus";
 import * as sync from "./sync";
 
@@ -148,7 +148,7 @@ export function snapshot() {
   const health = standingOrderHealth();
   return {
     overview: overview(), orders: ordersView(), plan, standing: health, guards: trippedGuards(health).map((g) => ({ ...g, rule: { id: g.rule.id, spoken: g.rule.spoken, params: g.rule.params } })),
-    profile: profile(), sync: sync.status(), bills: billsView(), cash: cashView(), outlook: outlook(), briefing: briefing(), loan_offer: loanOffer(), dues: duesView(), rules: rulesView(), pending: pendingView(),
+    calls: callsView(), profile: profile(), sync: sync.status(), bills: billsView(), cash: cashView(), outlook: outlook(), briefing: briefing(), loan_offer: loanOffer(), dues: duesView(), rules: rulesView(), pending: pendingView(),
     customers: all("SELECT * FROM customers").map((c) => ({ ...c, usual: JSON.parse(c.usual) })),
     suppliers: all("SELECT * FROM suppliers"),
     items: all("SELECT id,sku,name_en,name_ta,name_hi,category,unit,price,stock FROM items ORDER BY category,name_en"),
@@ -299,7 +299,7 @@ export function placeRestock(input: { lines?: { item: string; qty: number }[]; s
       lines.push({ sku: it.sku, name: it.name_en, qty: Math.ceil(Number(w.qty) / it.pack) * it.pack, unit: it.unit, cost: it.cost, supplier_id: it.supplier_id, supplier: sup.name });
     }
   } else {
-    const pick = input.scope === "all_suggested" ? plan.lines.filter((l) => l.order_qty > 0 && l.urgency !== "ok") : urgentLines(plan);
+    let pick = input.scope === "all_suggested" ? plan.lines.filter((l) => l.order_qty > 0 && l.urgency !== "ok") : urgentLines(plan);
     lines = pick.map((l) => ({ sku: l.sku, name: l.name_en, qty: l.order_qty, unit: l.unit, cost: l.cost, supplier_id: l.supplier_id, supplier: l.supplier }));
   }
   if (!lines.length) throw new OpError("Nothing needs ordering right now.");
@@ -473,7 +473,7 @@ export function recordDelivery(supplier: string | number, lines: { item: string;
   return { receipt_id: Number(res.lastInsertRowid), supplier: sup.name, received: got, not_stocked: unknown };
 }
 
-export function importPurchase(doc: BillDoc, source: string) {
+export function importPurchase(doc: BillDoc, source: string, opts: { beforeDelivery?: boolean; dueIn?: number } = {}) {
   if (!doc.lines?.length) throw new OpError("That bill has no item lines.");
   let sup = doc.party ? matchSupplier(doc.party) : null;
   let newSupplier = false;
@@ -483,7 +483,8 @@ export function importPurchase(doc: BillDoc, source: string) {
     sup = get("SELECT * FROM suppliers WHERE id = ?", Number(r.lastInsertRowid)); newSupplier = true;
   }
   if (doc.ref && get("SELECT id FROM bills WHERE supplier_id = ? AND ref = ?", sup.id, doc.ref)) throw new OpError(`Bill ${doc.ref} from ${sup.name} is already in the app.`);
-  const receipt = get("SELECT * FROM receipts WHERE supplier_id = ? AND bill_id IS NULL ORDER BY id DESC", sup.id);
+  // An invoice for goods still on their way has no delivery to be checked against yet.
+  const receipt = opts.beforeDelivery ? null : get("SELECT * FROM receipts WHERE supplier_id = ? AND bill_id IS NULL ORDER BY id DESC", sup.id);
   const got = receipt ? new Map<string, number>(JSON.parse(receipt.lines).map((l: any) => [l.sku, l.qty])) : null;
   const unmatched: string[] = [];
   const lines = doc.lines.filter((l) => l.qty > 0).map((l) => {
@@ -496,11 +497,12 @@ export function importPurchase(doc: BillDoc, source: string) {
   const printed = doc.total != null ? Math.round(doc.total) : sum;
   const notes: string[] = [];
   if (Math.abs(printed - sum) > 1) notes.push(`The bill says ${inr(printed)} but its lines add up to ${inr(sum)}.`);
-  if (!receipt) notes.push("No delivery count on record for this supplier, so quantities could not be checked.");
+  if (opts.beforeDelivery) notes.push("Ordered by phone. The goods have not arrived yet: count the delivery before paying.");
+  else if (!receipt) notes.push("No delivery count on record for this supplier, so quantities could not be checked.");
   if (unmatched.length) notes.push(`Not in your item list: ${unmatched.join(", ")}.`);
   if (doc.notes) notes.push(doc.notes);
   const ref = doc.ref || `${source.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-5)}`;
-  const res = run("INSERT INTO bills (supplier_id,ref,lines,amount,due_day,source,note) VALUES (?,?,?,?,?,?,?)", sup.id, ref, JSON.stringify(lines), Math.max(printed, sum), addDays(today(), 3), source, notes.join(" "));
+  const res = run("INSERT INTO bills (supplier_id,ref,lines,amount,due_day,source,note) VALUES (?,?,?,?,?,?,?)", sup.id, ref, JSON.stringify(lines), Math.max(printed, sum), addDays(today(), opts.dueIn ?? 3), source, notes.join(" "));
   const id = Number(res.lastInsertRowid);
   if (receipt) run("UPDATE receipts SET bill_id = ? WHERE id = ?", id, receipt.id);
   const checked = checkBill(id);
@@ -542,6 +544,95 @@ export function importDocs(docs: BillDoc[], source: string) {
   return { source, bills, skipped, sales: sales.invoices ? { invoices: sales.invoices, lines: sales.lines, value: sales.value, days: sales.days.size, not_stocked: [...sales.unmatched].slice(0, 12) } : null };
 }
 
+// ---------- Ordering by phone ----------
+// Saajhedar rings each supplier and places the restock order. Whether a call may
+// be made unasked, and what may be agreed on it, is decided here in code:
+// the owner's ordering rule sets the amount, and a price more than 5% above
+// the last one is never accepted on the owner's behalf.
+// The supplier's side is simulated in this prototype. A real call would run on
+// Sarvam's voice agents and report back through /api/calls/webhook.
+const PRICE_TOLERANCE = 0.05;
+type OrderLine = { sku: string; name: string; qty: number; unit: string; cost: number; supplier_id: number; supplier: string };
+
+export function callSuppliers(input: { scope?: "urgent" | "all_suggested" } = {}) {
+  const plan = restockPlan();
+  let pick = input.scope === "all_suggested" ? plan.lines.filter((l) => l.order_qty > 0 && l.urgency !== "ok") : urgentLines(plan);
+  if (!pick.length) throw new OpError("Nothing needs ordering right now.");
+  // Do not ring a supplier again within twelve hours, or while a call to them is waiting for the PIN.
+  const done = new Set<number>([
+    ...all("SELECT supplier_id FROM calls WHERE supplier_id IS NOT NULL AND at > ?", new Date(Date.now() - 12 * 3600 * 1000).toISOString()).map((r: any) => Number(r.supplier_id)),
+    ...all("SELECT payload FROM pending WHERE kind = 'phone_order' AND status = 'waiting'").map((r: any) => Number(JSON.parse(r.payload).supplier_id)),
+  ]);
+  pick = pick.filter((l) => !done.has(l.supplier_id));
+  if (!pick.length) throw new OpError("Today's suppliers have already been called. Their invoices are in Pay, and any call above your limit is waiting for your PIN.");
+  const bySupplier = new Map<number, OrderLine[]>();
+  for (const l of pick) bySupplier.set(l.supplier_id, [...(bySupplier.get(l.supplier_id) ?? []), { sku: l.sku, name: l.name_en, qty: l.order_qty, unit: l.unit, cost: l.cost, supplier_id: l.supplier_id, supplier: l.supplier }]);
+  const called: any[] = [], needs_pin: any[] = [];
+  for (const [sid, ls] of bySupplier) {
+    const total = Math.round(ls.reduce((s, l) => s + l.qty * l.cost, 0));
+    const v = judgeOrder(sid, ls[0].supplier, total);
+    if (v.decision === "allow") called.push(phoneCall(sid, ls, `Rule #${v.rule.id}`));
+    else needs_pin.push({ supplier: ls[0].supplier, total, why: v.why, pending_id: addPending("phone_order", { supplier_id: sid, lines: ls }, `Call ${ls[0].supplier} and order ${inr(total)}`, v.why) });
+  }
+  emit({ type: "refresh" });
+  return { called, needs_pin, note: "The supplier's side of each call is simulated in this prototype. Invoices from the calls are in Pay; pay after the delivery is counted." };
+}
+
+export function phoneCall(supplierId: number, lines: OrderLine[], via: string) {
+  const sup = get("SELECT * FROM suppliers WHERE id = ?", supplierId);
+  if (!sup) throw new OpError("Unknown supplier.");
+  // What the supplier says back. Fixed per supplier so a demo runs the same way twice:
+  // one is short of an item, one has raised a price a little, one has raised it a lot.
+  const big = lines.reduce((a, l) => (l.qty * l.cost > a.qty * a.cost ? l : a), lines[0]);
+  const answered = lines.map((l, i) => {
+    let qty = l.qty, rate = l.cost;
+    if (supplierId % 2 === 1 && l === big && lines.length > 1) qty = Math.max(1, Math.floor(l.qty * 0.8));
+    if (supplierId === 3 && i === 0) rate = Math.round(l.cost * 1.04 * 100) / 100;
+    if (supplierId === 1 && i === lines.length - 1 && lines.length > 1) rate = Math.round(l.cost * 1.12 * 100) / 100;
+    return { ...l, asked: l.qty, qty, rate, short: qty < l.qty, rise: rate / l.cost - 1 };
+  });
+  const agreed = answered.filter((l) => l.rise <= PRICE_TOLERANCE);
+  const left = answered.filter((l) => l.rise > PRICE_TOLERANCE);
+  const total = Math.round(agreed.reduce((s, l) => s + l.qty * l.rate, 0));
+  const turns: { who: "saajhedar" | "supplier"; text: string }[] = [
+    { who: "saajhedar", text: `Hello, this is Saajhedar calling for ${shop().name}. I'd like to place an order: ${lines.map((l) => `${l.name} ${l.qty} ${l.unit}`).join(", ")}.` },
+    { who: "supplier", text: answered.some((l) => l.short || l.rise > 0)
+      ? answered.filter((l) => l.short || l.rise > 0).map((l) => l.short ? `I only have ${l.qty} ${l.unit} of ${l.name.toLowerCase()}` : `${l.name} has gone up to ${inr(l.rate)} a ${l.unit}`).join(", and ") + ". The rest is fine."
+      : "Yes, all of that is in stock at the usual price." },
+    { who: "saajhedar", text: [answered.some((l) => l.short) ? "I'll take what you have." : "", left.length ? `${left.map((l) => l.name).join(" and ")} is more than five percent up, so I'll leave that for the owner to decide.` : "", `Please confirm ${agreed.length} item${agreed.length === 1 ? "" : "s"} for ${inr(total)}, and send the invoice.`].filter(Boolean).join(" ") },
+    { who: "supplier", text: `Confirmed. It will reach you ${sup.lead_days === 0 ? "today" : sup.lead_days === 1 ? "tomorrow" : `in ${sup.lead_days} days`}. Sending the invoice now.` },
+  ];
+  const summary = `${agreed.length} of ${lines.length} items ordered for ${inr(total)}` + (answered.some((l) => l.short) ? `, ${answered.filter((l) => l.short).map((l) => `${l.name.toLowerCase()} short by ${l.asked - l.qty} ${l.unit}`).join(", ")}` : "") + (left.length ? `, ${left.map((l) => l.name.toLowerCase()).join(", ")} left for you (price up ${Math.round(left[0].rise * 100)}%)` : "");
+  let orderId: number | null = null, billId: number | null = null;
+  if (agreed.length) {
+    orderId = Number(run("INSERT INTO supplier_orders (supplier_id,lines,total,status,created_at) VALUES (?,?,?,?,?)", supplierId, JSON.stringify(agreed.map((l) => ({ sku: l.sku, name: l.name, qty: l.qty, unit: l.unit, cost: l.rate }))), total, "confirmed by phone", nowIso()).lastInsertRowid);
+    const bill = importPurchase({ type: "purchase", party: sup.name, ref: `${sup.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase()}-P${Date.now().toString().slice(-5)}`, date: today(),
+      lines: agreed.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, rate: l.rate })), total }, "phone order", { beforeDelivery: true, dueIn: Math.max(1, sup.lead_days) });
+    billId = bill.bill_id;
+  }
+  const id = Number(run("INSERT INTO calls (at,supplier_id,supplier,mode,status,via,lines,total,transcript,summary,order_id,bill_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", nowIso(), supplierId, sup.name, "simulated",
+    agreed.length ? "ordered" : "nothing agreed", via, JSON.stringify(answered.map((l) => ({ name: l.name, unit: l.unit, asked: l.asked, qty: l.qty, rate: l.rate, agreed: l.rise <= PRICE_TOLERANCE }))), total, JSON.stringify(turns), summary, orderId, billId).lastInsertRowid);
+  log("stock", `Called ${sup.name} and placed an order`, `${summary}. ${via}`, via.startsWith("Rule") ? "rule" : "owner");
+  // The wording of the call is rewritten in the shop's language when Claude is available; what was agreed does not change.
+  writeCall(turns, shop().language, sup.name).then((t) => { if (t) { run("UPDATE calls SET transcript = ? WHERE id = ?", JSON.stringify(t), id); emit({ type: "refresh" }); } }).catch(() => {});
+  emit({ type: "refresh" });
+  return { call_id: id, supplier: sup.name, status: agreed.length ? "ordered" : "nothing agreed", total, summary, bill_id: billId, left_for_owner: left.map((l) => ({ item: l.name, new_rate: l.rate, was: l.cost })), simulated: true };
+}
+
+// What Sarvam's voice agent platform posts after a real call. The shape is not
+// verified against a live campaign, so the event is kept whole and read loosely.
+export function callWebhook(body: any) {
+  const text = Array.isArray(body?.transcript) ? body.transcript.map((t: any) => ({ who: /agent|assistant|bot/i.test(t.role ?? t.speaker ?? "") ? "saajhedar" : "supplier", text: String(t.text ?? t.content ?? "") }))
+    : body?.transcript ? [{ who: "supplier", text: String(body.transcript).slice(0, 4000) }] : [];
+  const vars = body?.variables ?? body?.agent_variables ?? {};
+  const name = String(vars.supplier ?? body?.contact?.name ?? "Supplier").slice(0, 60);
+  const id = Number(run("INSERT INTO calls (at,supplier,mode,status,via,transcript,summary) VALUES (?,?,?,?,?,?,?)", nowIso(), name, "sarvam", String(body?.outcome ?? body?.status ?? "received").slice(0, 40), "Sarvam voice agent",
+    JSON.stringify(text), String(vars.summary ?? "").slice(0, 300)).lastInsertRowid);
+  emit({ type: "refresh" });
+  return { ok: true, call_id: id };
+}
+const callsView = () => all("SELECT * FROM calls ORDER BY id DESC LIMIT 8").map((c) => ({ ...c, lines: JSON.parse(c.lines), transcript: JSON.parse(c.transcript) }));
+
 // ---------- Setting up ----------
 // Links the shop to its owner. The phone check and the merchant account lookup
 // are simulated; nothing here reaches Paytm.
@@ -557,14 +648,14 @@ export function onboard(input: { name?: string; owner?: string; kind?: string; l
   const put = (k: string, v: string) => run("INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", k, v);
   put("profile", JSON.stringify(profile));
   if (input.pin) put("pin", String(input.pin));
-  log("rules", `${name} is set up`, profile.books === "paper" ? "Thunai is the bill book from today" : profile.books === "app" ? "Bills will be shared with the billing app" : "Starting the bill book from today", "owner");
+  log("rules", `${name} is set up`, profile.books === "paper" ? "Saajhedar is the bill book from today" : profile.books === "app" ? "Bills will be shared with the billing app" : "Starting the bill book from today", "owner");
   emit({ type: "refresh" });
   return { ok: true, shop: shop(), profile };
 }
 export const profile = () => { const r = get("SELECT value FROM settings WHERE key = 'profile'"); return r ? JSON.parse(r.value) : null; };
 
 // ---------- Acting first ----------
-// What Thunai may do unasked: only things a signed rule already allows.
+// What Saajhedar may do unasked: only things a signed rule already allows.
 export function autopilot() {
   const done: string[] = [];
   for (const b of billsView()) {
@@ -645,6 +736,9 @@ export function resolvePending(id: number, pin: string | null, approve: boolean)
       if (payload.amount > shop().cash) throw new OpError("Cash on hand no longer covers this payment.");
       settleBill(payload.bill_id, payload.amount, "Owner PIN");
       outcome = `Paid ${inr(payload.amount)}.`;
+    } else if (p.kind === "phone_order") {
+      const c = phoneCall(payload.supplier_id, payload.lines, "Owner PIN");
+      outcome = c.summary;
     } else if (p.kind === "add_rule") {
       run("INSERT INTO rules (kind,params,spoken,signed_at) VALUES (?,?,?,?)", payload.kind, JSON.stringify(payload.params), payload.spoken, nowIso());
       log("rules", `New rule signed with PIN`, `"${payload.spoken}"`, "owner");

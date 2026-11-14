@@ -23,7 +23,7 @@ const S = {
   area: ["Area view", "பகுதி பார்வை", "इलाक़ा"],
   needsYou: ["Needs you", "உங்கள் கவனத்திற்கு", "आपके लिए"],
   allClear: ["Nothing is waiting for you.", "உங்களுக்காக எதுவும் காத்திருக்கவில்லை.", "आपके लिए कुछ बाकी नहीं है।"],
-  didToday: ["What Thunai did", "துணை செய்தவை", "थुनई ने क्या किया"],
+  didToday: ["What Saajhedar did", "சாஜேதார் செய்தவை", "साझेदार ने क्या किया"],
   ordersWaiting: ["orders waiting", "ஆர்டர்கள் காத்திருக்கின்றன", "ऑर्डर बाकी"],
   orderWaiting: ["order waiting", "ஆர்டர் காத்திருக்கிறது", "ऑर्डर बाकी"],
   runOutSoon: ["items run out within two days", "பொருட்கள் இரண்டு நாளில் தீரும்", "चीज़ें दो दिन में ख़त्म"],
@@ -80,7 +80,7 @@ const S = {
   daysOld: ["days", "நாட்கள்", "दिन"],
   noDues: ["Nobody owes the shop anything.", "யாரும் கடன் வைக்கவில்லை.", "किसी का उधार बाकी नहीं।"],
   // Rules
-  rulesLead: ["Spoken by you, signed with your PIN. Thunai cannot change them.", "நீங்கள் சொன்னவை, உங்கள் PIN-ஆல் உறுதி செய்யப்பட்டவை. துணையால் மாற்ற முடியாது.", "आपने कहे, आपके PIN से पक्के। थुनई इन्हें बदल नहीं सकता।"],
+  rulesLead: ["Spoken by you, signed with your PIN. Saajhedar cannot change them.", "நீங்கள் சொன்னவை, உங்கள் PIN-ஆல் உறுதி செய்யப்பட்டவை. சாஜேதாரால் மாற்ற முடியாது.", "आपने कहे, आपके PIN से पक्के। साझेदार इन्हें बदल नहीं सकता।"],
   sayARule: ["Say a rule to add one. For example:", "புதிய விதி சேர்க்க சொல்லுங்கள். உதாரணம்:", "नया नियम बोलकर जोड़ें। जैसे:"],
   remove: ["Remove", "நீக்கு", "हटाएँ"],
   // PIN

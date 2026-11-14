@@ -45,3 +45,21 @@ Write one message per person in ${LANG_NAME[l]}, the way a courteous shopkeeper 
     return fallback();
   }
 }
+
+// Rewrites the wording of a supplier call so it sounds like two people on the
+// phone in the shop's language. The facts (items, quantities, prices) are fixed
+// by the caller; a rewrite that drops a turn is thrown away.
+export async function writeCall(turns: { who: string; text: string }[], lang: string, supplier: string): Promise<{ who: string; text: string }[] | null> {
+  if (!claudeReady()) return null;
+  try {
+    const out = await structured<{ turns: { text: string }[] }>({
+      system: `You rewrite a short phone call between a shop's ordering assistant and a supplier (${supplier}) in Chennai so it sounds natural and spoken, in ${LANG_NAME[lang] ?? LANG_NAME["en-IN"]}. Keep the same number of turns in the same order, and keep every item, quantity, price and amount exactly as given. Do not add offers, promises or small talk beyond a greeting.`,
+      content: JSON.stringify(turns),
+      tool: { name: "write_call", description: "The rewritten turns, one per original turn, in order.", input_schema: { type: "object", additionalProperties: false, required: ["turns"],
+        properties: { turns: { type: "array", items: { type: "object", additionalProperties: false, required: ["text"], properties: { text: { type: "string" } } } } } } },
+      maxTokens: 1500,
+    });
+    if (out.turns?.length !== turns.length) return null;
+    return turns.map((t, i) => ({ who: t.who, text: String(out.turns[i].text) }));
+  } catch { return null; }
+}

@@ -37,7 +37,7 @@ const fail = (err: unknown) => {
 
 // Words the speech recogniser should expect: item, customer and supplier names.
 function keyterms(): string[] {
-  const out = new Set<string>(["Thunai", "udhaar", "Paytm", "Soundbox", "Karthigai Deepam"]);
+  const out = new Set<string>(["Saajhedar", "udhaar", "Paytm", "Soundbox", "Karthigai Deepam"]);
   for (const r of all("SELECT name_en, name_ta, name_hi FROM items")) { out.add(r.name_en); out.add(r.name_ta); out.add(r.name_hi); }
   for (const r of all("SELECT name FROM customers")) out.add(r.name);
   for (const r of all("SELECT name FROM suppliers")) out.add(r.name);
@@ -166,6 +166,8 @@ Bun.serve({
       if ((mm = p.match(/^\/api\/rules\/(\d+)\/remove$/)) && m === "POST") return json(ops.proposeRuleRemoval(Number(mm[1])));
       if (p === "/api/reset" && m === "POST") { seed(true); resetSessions(); sync.demoReset(); ops.autopilot(); return json({ ok: true }); }
 
+      if (p === "/api/calls" && m === "POST") return json(ops.callSuppliers(await req.json().catch(() => ({})) as any));
+      if (p === "/api/calls/webhook" && m === "POST") return json(ops.callWebhook(await req.json()));
       if (p === "/api/onboard" && m === "POST") { const r = ops.onboard(await req.json() as any); refreshWeather(); return json(r); }
       if (p === "/api/area/kinds") return json(area.openableKinds());
       if (p === "/api/area/fit") return json(area.fit(num(url.searchParams.get("lat")), num(url.searchParams.get("lon")), num(url.searchParams.get("r"), 800), url.searchParams.get("kind") || null, num(url.searchParams.get("budget"), 0) || null));

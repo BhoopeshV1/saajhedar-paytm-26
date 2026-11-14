@@ -1,4 +1,4 @@
-# Thunai
+# Saajhedar
 
 Voice-first business partner for a kirana, built for the Paytm Build for India AI Hackathon (Track 1). Hackathon prototype: payments, loans and reminders are simulated, and shop figures are made up.
 
@@ -27,7 +27,7 @@ Listings miss small shops without an online presence, so counts are a guide, not
 ## Bill book and billing apps
 
 - **Counter bills.** The owner calls out the items and the assistant's `make_bill` tool writes the bill, takes the items out of stock and records the money. `POST /api/bills/counter` does the same without voice.
-- **Sending bills out.** `GET /api/billing/export?what=sales|purchases|stock&format=xlsx|csv|tally` downloads a file. `POST /api/billing/sync/connect` with `{url}` (https only) or `{demo:true}` makes the server POST every sale, supplier bill and payment as signed JSON (`X-Thunai-Signature`, HMAC-SHA256). `server/sync.ts` holds both, plus a stand-in billing app used for the demo.
+- **Sending bills out.** `GET /api/billing/export?what=sales|purchases|stock&format=xlsx|csv|tally` downloads a file. `POST /api/billing/sync/connect` with `{url}` (https only) or `{demo:true}` makes the server POST every sale, supplier bill and payment as signed JSON (`X-Saajhedar-Signature`, HMAC-SHA256). `server/sync.ts` holds both, plus a stand-in billing app used for the demo.
 - Connectors for named billing apps are not built, and the Tally XML has only been read back by this app's own importer, not by Tally.
 
 ## Welcome and setup

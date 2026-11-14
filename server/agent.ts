@@ -83,6 +83,10 @@ const TOOLS: ToolDef[] = [
     input_schema: obj({ scope: { type: "string", enum: ["urgent", "all_suggested"] },
       lines: { type: "array", items: obj({ item: { type: "string" }, qty: { type: "number" } }, ["item", "qty"]) } }),
     run: (i) => ops.placeRestock(i) },
+  { name: "call_suppliers", personas: ["owner"], screen: "stock",
+    description: "Phone the suppliers and place the restock order by voice, one call per supplier. A call is made unasked only if the owner's ordering rule allows that amount; otherwise it waits for the owner's PIN. On each call the supplier confirms what they have and the price; a price more than 5% above the last one is left for the owner. The supplier's invoice then appears in Pay. In this prototype the supplier's side of the call is simulated. Use this when the owner says to call, phone or ring the suppliers, or to order by phone.",
+    input_schema: obj({ scope: { type: "string", enum: ["urgent", "all_suggested"] } }),
+    run: (i) => ops.callSuppliers(i) },
   { name: "adjust_standing_order", personas: ["owner"], screen: "stock",
     description: "Pause, resume, cut or cancel a standing supplier order (for example the daily milk or weekly bread). For 'cut' give the new quantity. Only do this when the owner asks for it.",
     input_schema: obj({ standing_id: { type: "integer" }, action: { type: "string", enum: ["pause", "resume", "cut", "cancel"] }, qty: { type: "number" } }, ["standing_id", "action"]),
@@ -134,12 +138,13 @@ const TOOLS: ToolDef[] = [
       suppliers: all("SELECT id, name FROM suppliers"), standing_items: all("SELECT DISTINCT i.id, i.name_en FROM standing_orders so JOIN items i ON i.id = so.item_id") }) },
   { name: "propose_rule", personas: ["owner"], screen: "rules",
     description: `Draft a rule from what the owner just said. It is NOT saved until the owner enters their PIN on screen. Kinds and params:
+- order_limit: {supplier_id: integer or null for all suppliers, max_amount: rupees}. Phone the supplier and place a restock order up to this amount per call without asking.
 - pay_limit: {supplier_id: integer or null for all suppliers, max_amount: rupees}. Pay without asking up to this amount.
 - new_supplier: {}. Never pay a supplier that has not been paid before without the owner.
 - standing_guard: {item_id, leftover_gt: number, action: "pause"|"cut"|"cancel"}. When more than leftover_gt units are left over, pause/cut/cancel that standing order.
 - credit_limit: {max_due: rupees}. No more udhaar for anyone who owes over this.
 'spoken' is the rule in the owner's own words, in their language, as one clear sentence. Call list_rules first if you need supplier or item ids.`,
-    input_schema: obj({ kind: { type: "string", enum: ["pay_limit", "new_supplier", "standing_guard", "credit_limit"] },
+    input_schema: obj({ kind: { type: "string", enum: ["order_limit", "pay_limit", "new_supplier", "standing_guard", "credit_limit"] },
       params: { type: "object", additionalProperties: true }, spoken: { type: "string" } }, ["kind", "params", "spoken"]),
     run: (i) => ops.proposeRule(i.kind, i.params, i.spoken) },
   { name: "propose_rule_removal", personas: ["owner"], screen: "rules",
@@ -185,7 +190,7 @@ const SPEECH_RULES = `How to speak:
 
 function systemPrompt(persona: Persona, ctx: { shop: any; customer?: any }) {
   if (persona === "customer") {
-    return `You are Thunai, taking orders by voice for ${ctx.shop.name}, a neighbourhood grocery shop in ${ctx.shop.locality}, Chennai. You are speaking with a regular customer${ctx.customer ? ` named ${ctx.customer.name}` : ""} who has called to order.
+    return `You are Saajhedar, taking orders by voice for ${ctx.shop.name}, a neighbourhood grocery shop in ${ctx.shop.locality}, Chennai. You are speaking with a regular customer${ctx.customer ? ` named ${ctx.customer.name}` : ""} who has called to order.
 
 Your job: understand what they want, place the order with the place_order tool, then confirm it back in one breath: the items, the total, and that the bag will be ready for pick-up (or sent by bike parcel if they asked).
 - If they say "the usual" or the equivalent in Tamil or Hindi ("வழக்கம் போல", "रोज़ वाला"), order their usual basket with usual=true.
@@ -195,7 +200,7 @@ Your job: understand what they want, place the order with the place_order tool, 
 
 ${SPEECH_RULES}`;
   }
-  return `You are Thunai, the business partner for ${ctx.shop.name}, a neighbourhood grocery (kirana) shop in ${ctx.shop.locality}, Chennai, run by ${ctx.shop.owner} and family. You live inside the Paytm for Business app and are operated almost entirely by voice. The person speaking is the owner or a family member at the counter, usually with their hands full.
+  return `You are Saajhedar, the business partner for ${ctx.shop.name}, a neighbourhood grocery (kirana) shop in ${ctx.shop.locality}, Chennai, run by ${ctx.shop.owner} and family. You live inside the Paytm for Business app and are operated almost entirely by voice. The person speaking is the owner or a family member at the counter, usually with their hands full.
 
 You help with four jobs, and the tools are grouped the same way:
 - Sell: take and track customer orders, and make counter bills. When the owner calls out items being sold at the counter, call make_bill straight away without asking for confirmation, then say only the total and the number of items, and mention anything that needs a price or has just run out.

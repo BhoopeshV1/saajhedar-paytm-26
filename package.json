@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Thunai - a voice-first business partner for the neighbourhood shop. Hackathon prototype.",
+  "description": "Saajhedar - a voice-first business partner for the neighbourhood shop. Hackathon prototype.",
   "scripts": {
     "dev": "bun run --hot server/index.ts & vite --config web/vite.config.ts",
     "server": "bun run --hot server/index.ts",

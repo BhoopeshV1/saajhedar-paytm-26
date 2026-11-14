@@ -79,14 +79,14 @@ function rng(seed: number) {
 export function seed(reset = false) {
   migrate();
   if (reset) {
-    for (const t of ["outbox", "settings", "receipts", "activity", "pending", "loans", "rules", "due_payments", "dues", "bills", "supplier_orders",
+    for (const t of ["calls", "outbox", "settings", "receipts", "activity", "pending", "loans", "rules", "due_payments", "dues", "bills", "supplier_orders",
       "standing_orders", "orders", "customers", "sales", "items", "suppliers", "shop"]) db.exec(`DELETE FROM ${t}`);
   } else if (get("SELECT id FROM shop WHERE id = 1")) return;
 
   const t = today();
   const tx = db.transaction(() => {
     run("INSERT INTO shop (id,name,owner,locality,lat,lon,cash,language) VALUES (1,?,?,?,?,?,?,?)",
-      "Sri Murugan Stores", "Selvam", "West Tambaram", 12.928, 80.1086, 21500, "ta-IN");
+      "Sri Murugan Stores", "Selvam", "West Tambaram", 12.928, 80.1086, 21500, "en-IN");
 
     for (const s of SUPPLIERS) run("INSERT INTO suppliers (id,name,supplies,trusted,lead_days) VALUES (?,?,?,?,?)", ...s);
 
@@ -164,6 +164,7 @@ export function seed(reset = false) {
         new Date(Date.now() - daysAgo * 86400000).toISOString());
     rule("pay_limit", { supplier_id: 2, max_amount: 3000 }, "Pay the milk supplier up to ₹3,000 without asking. Above that, ask me.", 21);
     rule("new_supplier", {}, "Never pay a new supplier without me.", 21);
+    rule("order_limit", { supplier_id: null, max_amount: 8000 }, "Phone my suppliers and order up to ₹8,000 a call without asking. Above that, ask me.", 14);
 
     // Two orders already waiting this morning.
     const order = (cid: number, lines: [string, number][], status: string, minsAgo: number, said: string) => {

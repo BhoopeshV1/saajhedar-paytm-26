@@ -8,9 +8,9 @@ import { IconCheck, IconChevron } from "../icons";
 import { handoff, lakh, askFor } from "../plan";
 import { StartKit } from "./StartKit";
 
-type Step = "splash" | "start" | "phone" | "otp" | "shop" | "books" | "pin" | "fence" | "fit";
+type Step = "start" | "phone" | "otp" | "shop" | "books" | "pin" | "fence" | "fit";
 const BUDGETS = [100000, 300000, 500000, 1000000, 2000000];
-const LANGS: [Lang, string][] = [["ta-IN", "தமிழ்"], ["hi-IN", "हिंदी"], ["en-IN", "English"]];
+const LANGS: [Lang, string][] = [["en-IN", "English"], ["ta-IN", "தமிழ்"], ["hi-IN", "हिंदी"]];
 const ANCHOR: Record<string, string> = { worship: "places of worship", college: "colleges", school: "schools", hospital: "hospitals", transit: "bus and train stops", office: "offices", mall: "malls", cinema: "cinemas", park: "parks" };
 const Back = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6" /></svg>;
 
@@ -28,17 +28,33 @@ function Locality({ value, onPick, L }: { value: AreaHit | null; onPick: (h: Are
   </>);
 }
 
+// Shown every time the app opens, over whatever screen is loading underneath.
+// It stays until Proceed is tapped.
+export function Splash({ onDone }: { onDone: () => void }) {
+  const { lang, setLang } = useApp();
+  const L = (en: string, ta: string, hi: string) => (lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en);
+  return (
+    <div className="splash">
+      <div className="seg splash-lang">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
+      <span className="soap" aria-hidden="true"><i className="b-rim" /><i className="b-core" /><i className="b-shine" /></span>
+      <span className="splash-name">Saajhedar</span>
+      <span className="splash-line">{L("Your shop's partner", "உங்கள் கடையின் துணை", "आपकी दुकान का साथी")}</span>
+      <span className="splash-made">{L("Built at the Paytm Build for India AI Hackathon, Chennai", "Paytm Build for India AI ஹேக்கத்தான், சென்னையில் உருவாக்கப்பட்டது", "Paytm Build for India AI हैकाथॉन, चेन्नई में बनाया गया")}<br />{L("by team Finance Tours", "குழு: Finance Tours", "टीम: Finance Tours")}</span>
+      <button className="btn splash-go" onClick={onDone}>{L("Proceed", "தொடர்", "आगे बढ़ें")}</button>
+    </div>
+  );
+}
+
 export function Welcome({ onDone }: { onDone: (how: string) => void }) {
   const { lang, setLang, go, setFocus, say, health, refresh, toast } = useApp();
   const L = (en: string, ta: string, hi: string) => (lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en);
   const kn = (k: { label: string; ta: string; hi: string }) => L(k.label, k.ta, k.hi);
   const from = handoff.setup ? handoff.plan : null; // arriving from the map with a plan already made
-  const [step, setStep] = useState<Step>(from ? "phone" : "splash");
+  const [step, setStep] = useState<Step>(from ? "phone" : "start");
   const [fresh, setFresh] = useState(!!from);
   const [kit, setKitState] = useState<string[]>(handoff.kit);
   const setKit = (k: string[]) => { handoff.kit = k; setKitState(k); };
   useEffect(() => { handoff.setup = false; }, []);
-  useEffect(() => { if (step !== "splash") return; const t = setTimeout(() => setStep("start"), 3400); return () => clearTimeout(t); }, [step]);
   const [kinds, setKinds] = useState<KindLite[]>([]);
   const [phone, setPhone] = useState(""); const [otp, setOtp] = useState("");
   const [name, setName] = useState(""); const [owner, setOwner] = useState("");
@@ -52,7 +68,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
   useEffect(() => { api.kinds().then(setKinds).catch(() => {}); }, []);
   useEffect(() => { window.scrollTo({ top: 0 }); setError(null); }, [step]);
 
-  const prev: Record<Step, Step> = { splash: "start", start: "start", phone: "start", otp: "phone", shop: "otp", books: "shop", pin: "books", fence: "start", fit: "fence" };
+  const prev: Record<Step, Step> = { start: "start", phone: "start", otp: "phone", shop: "otp", books: "shop", pin: "books", fence: "start", fit: "fence" };
   const stage = step === "phone" || step === "otp" ? 1 : step === "shop" || step === "books" ? 2 : 3;
 
   const finish = async () => {
@@ -92,18 +108,10 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     </div>
   );
 
-  if (step === "splash") return (
-    <button className="splash" onClick={() => setStep("start")} aria-label="Continue">
-      <span className="soap" aria-hidden="true"><i className="b-rim" /><i className="b-core" /><i className="b-shine" /></span>
-      <span className="splash-name">Thunai</span>
-      <span className="splash-line">{L("Your shop's partner", "உங்கள் கடையின் துணை", "आपकी दुकान का साथी")}</span>
-    </button>
-  );
-
   if (step === "start") return (
     <div className="welcome">
       {top}
-      <h1 className="brand">Thunai</h1>
+      <h1 className="brand">Saajhedar</h1>
       <p className="brand-sub">{L("A partner for your shop. It sells, stocks, pays and collects, by voice.", "உங்கள் கடைக்கு ஒரு துணை. குரலால் விற்கும், சரக்கு வாங்கும், பணம் கட்டும், வசூலிக்கும்.", "आपकी दुकान का साथी। बोलकर बेचता, माल मँगाता, भुगतान और वसूली करता है।")}</p>
       <button className="door" onClick={() => { setFresh(false); setStep("phone"); }}>
         <span className="door-title">{L("I run a shop", "எனக்கு ஒரு கடை இருக்கிறது", "मेरी दुकान है")}</span><IconChevron />
@@ -170,7 +178,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
         {fit.crowded.length > 0 && <p className="fine">Already crowded here: {fit.crowded.map((k) => `${kn(k).toLowerCase()} (${k.here})`).join(", ")}.</p>}
         <p className="fine">{fit.caveat} {fit.setup_cost_note}</p>
         <StartKit chosen={c} budget={budget} kit={kit} setKit={setKit} L={L} />
-        {health?.claude && <button className="btn btn-primary" onClick={() => toMap(true)}>{L("Ask Thunai what it would open", "துணையிடம் கேளுங்கள்", "थुनै से पूछें")}</button>}
+        {health?.claude && <button className="btn btn-primary" onClick={() => toMap(true)}>{L("Ask Saajhedar what it would open", "சாஜேதாரிடம் கேளுங்கள்", "साझेदार से पूछें")}</button>}
         <button className="btn btn-outline" onClick={() => toMap(false)}>{L("See it on the map", "வரைபடத்தில் பார்", "नक्शे पर देखें")}</button>
         <button className="link" onClick={() => { setFresh(true); setStep("phone"); }}>{L("I have decided. Set up my shop", "முடிவு செய்துவிட்டேன். என் கடையை அமை", "तय कर लिया। मेरी दुकान सेट करें")}</button>
       </div>
@@ -217,8 +225,8 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
 
       {step === "books" && <>
         <h1 className="h-step">{L("How do you write bills today?", "இப்போது பில் எப்படி எழுதுகிறீர்கள்?", "अभी बिल कैसे बनाते हैं?")}</h1>
-        {([["paper", L("On a paper pad", "காகிதத்தில்", "कागज़ की पर्ची पर"), L("Call out the items as you always do. Thunai writes the bill and keeps the stock count.", "எப்போதும் போல பொருட்களைச் சொல்லுங்கள். துணை பில் எழுதி இருப்பைக் கணக்கிடும்.", "हमेशा की तरह सामान बोलिए। थुनै बिल लिखेगा और स्टॉक गिनेगा।")],
-          ["app", L("In a billing app", "பில்லிங் ஆப்பில்", "बिलिंग ऐप में"), L("Keep it. Thunai reads its exports and sends every sale and payment back to it.", "அதையே வைத்திருங்கள். துணை அதிலிருந்து படித்து, ஒவ்வொரு விற்பனையையும் திருப்பி அனுப்பும்.", "उसे रखिए। थुनै उसकी फ़ाइलें पढ़ेगा और हर बिक्री वापस भेजेगा।")],
+        {([["paper", L("On a paper pad", "காகிதத்தில்", "कागज़ की पर्ची पर"), L("Call out the items as you always do. Saajhedar writes the bill and keeps the stock count.", "எப்போதும் போல பொருட்களைச் சொல்லுங்கள். சாஜேதார் பில் எழுதி இருப்பைக் கணக்கிடும்.", "हमेशा की तरह सामान बोलिए। साझेदार बिल लिखेगा और स्टॉक गिनेगा।")],
+          ["app", L("In a billing app", "பில்லிங் ஆப்பில்", "बिलिंग ऐप में"), L("Keep it. Saajhedar reads its exports and sends every sale and payment back to it.", "அதையே வைத்திருங்கள். சாஜேதார் அதிலிருந்து படித்து, ஒவ்வொரு விற்பனையையும் திருப்பி அனுப்பும்.", "उसे रखिए। साझेदार उसकी फ़ाइलें पढ़ेगा और हर बिक्री वापस भेजेगा।")],
           ["none", L("I don't write bills", "பில் எழுதுவதில்லை", "बिल नहीं बनाता"), L("Start now by voice. No typing.", "இப்போதே குரலால் தொடங்குங்கள். தட்டச்சு தேவையில்லை.", "अभी बोलकर शुरू करें। टाइपिंग नहीं।")]] as const).map(([k, title, text]) => (
           <button key={k} className={`choice ${books === k ? "on" : ""}`} onClick={() => setBooks(k)}><span className="row-title">{title}</span><span className="row-detail">{text}</span></button>))}
         <button className="btn btn-primary" onClick={() => setStep("pin")}>{L("Continue", "தொடர்", "आगे बढ़ें")}</button>
@@ -226,7 +234,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
 
       {step === "pin" && <>
         <h1 className="h-step">{L("Choose a four-digit PIN", "நான்கு இலக்க PIN தேர்ந்தெடுங்கள்", "चार अंकों का PIN चुनें")}</h1>
-        <p className="lede">{L("Thunai can suggest and prepare. Money moves only inside rules you speak and sign with this PIN.", "துணை பரிந்துரைக்கும், தயார் செய்யும். நீங்கள் சொல்லி இந்த PIN-ஆல் கையொப்பமிட்ட விதிகளுக்குள் மட்டுமே பணம் நகரும்.", "थुनै सुझाव देगा और तैयारी करेगा। पैसा सिर्फ़ उन नियमों में चलेगा जो आप बोलकर इस PIN से मंज़ूर करेंगे।")}</p>
+        <p className="lede">{L("Saajhedar can suggest and prepare. Money moves only inside rules you speak and sign with this PIN.", "சாஜேதார் பரிந்துரைக்கும், தயார் செய்யும். நீங்கள் சொல்லி இந்த PIN-ஆல் கையொப்பமிட்ட விதிகளுக்குள் மட்டுமே பணம் நகரும்.", "साझेदार सुझाव देगा और तैयारी करेगा। पैसा सिर्फ़ उन नियमों में चलेगा जो आप बोलकर इस PIN से मंज़ूर करेंगे।")}</p>
         <input className="field otp" type="password" inputMode="numeric" autoComplete="off" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} aria-label="Four digit PIN" />
         {error && <p className="warn-line">{error}</p>}
         <button className="btn btn-primary" disabled={pin.length !== 4 || busy} onClick={finish}>{L("Open my shop", "என் கடையைத் திற", "मेरी दुकान खोलें")}</button>

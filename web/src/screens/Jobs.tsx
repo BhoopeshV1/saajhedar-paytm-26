@@ -6,6 +6,8 @@ import { t, nameOf, ago, reasonText } from "../i18n";
 import { Outlook } from "./Outlook";
 import { AddBill } from "./AddBill";
 import { BillBook } from "./BillBook";
+import { RulesFor } from "./RulesFor";
+import { PhoneOrders } from "./PhoneOrders";
 import { IconCheck, IconLock } from "../icons";
 
 function useFocusScroll(match: boolean) {
@@ -46,6 +48,7 @@ export function Sell() {
   return (
     <div className="screen">
       <h1 className="title">{t("sell", lang)}</h1>
+      <RulesFor job="sell" />
       <BillBook />
       {open.length === 0 && <p className="empty card">{t("noOrders", lang)}</p>}
       {groups.filter(([, list]) => list.length).map(([label, list]) => (
@@ -72,6 +75,8 @@ export function Stock() {
   return (
     <div className="screen">
       <h1 className="title">{t("stock", lang)}</h1>
+      <RulesFor job="stock" />
+      <PhoneOrders />
       <Outlook />
 
       <section className="card">
@@ -187,6 +192,7 @@ export function Pay() {
   return (
     <div className="screen">
       <h1 className="title">{t("pay", lang)}</h1>
+      <RulesFor job="pay" />
       <section className="card cash">
         <div className="cash-row"><span>{t("cashOnHand", lang)}</span><strong>{inr(c.cash)}</strong></div>
         <div className="cash-row"><span>{t("billsToPay", lang)}, 3 {t("days", lang)}</span><span className="num">{inr(c.bills_due_soon)}</span></div>
@@ -223,6 +229,7 @@ export function Collect() {
   return (
     <div className="screen">
       <h1 className="title">{t("collect", lang)}</h1>
+      <RulesFor job="collect" />
       <section className="card udhaar-total">
         <p className="muted">{t("udhaarOut", lang)}</p>
         <p className="big">{inr(total)}</p>

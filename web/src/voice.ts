@@ -159,6 +159,8 @@ export class VoiceEngine {
   beginReply(onDone: () => void) { this.expectMore = true; this.afterSpeech = onDone; }
 
   async enqueue(b64: string, last: boolean) {
+    // The person has started talking over a reply that is still arriving: they win.
+    if (this.state === "hearing") { if (last) this.expectMore = false; return; }
     const ctx = await this.unlock();
     const bin = atob(b64); const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -212,7 +214,12 @@ export class VoiceEngine {
   }
 
   // After a reply: keep listening if the mic is live, otherwise go quiet.
-  resume() { if (this.stream) { this.resetCapture(); this.set("listening"); } else this.set("off"); }
+  // If the person is already mid-sentence, leave their words alone.
+  resume() {
+    if (!this.stream) { this.set("off"); return; }
+    if (this.state === "hearing" || this.state === "listening") return;
+    this.resetCapture(); this.set("listening");
+  }
   setThinking() { this.set("thinking"); }
 
   // One-off sound outside a conversation (a new-order announcement).

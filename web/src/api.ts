@@ -11,6 +11,8 @@ export type FitKind = KindLite & { here: number; expected: number; peer_have: nu
 export type Fit = { lat: number; lon: number; radius_m: number; locality: string; locality_ta: string; total_listed: number; confidence: "good" | "fair" | "low"; budget: number | null;
   chosen: FitKind | null; options: FitKind[]; crowded: { label: string; ta: string; hi: string; here: number; expected: number }[];
   anchors: { key: string; n: number; names: string[] }[]; peers: string[]; caveat: string; setup_cost_note: string };
+export type Call = { id: number; at: string; supplier: string; mode: "simulated" | "sarvam"; status: string; via: string; total: number; summary: string; bill_id: number | null;
+  lines: { name: string; unit: string; asked: number; qty: number; rate: number; agreed: boolean }[]; transcript: { who: "saajhedar" | "supplier"; text: string }[] };
 export type SyncStatus = { target: { name: string; url: string; demo: boolean } | null; waiting: number; sent: number; failed: number;
   recent: { id: number; at: string; kind: "sale" | "sale_cancelled" | "purchase_bill" | "payment"; ref: string; title: string; status: "waiting" | "sent" | "failed"; error: string }[];
   demo_ledger: { entries: number; stock: { item: string; unit: string; change: number }[] } | null };
@@ -52,7 +54,7 @@ export type State = {
   bills: Bill[];
   cash: { cash: number; bills_due_soon: number; restock_cost: number; shortfall: number; udhaar_out: number; loan: any };
   loan_offer: LoanOffer;
-  outlook: OutlookT; briefing: Briefing; sync: SyncStatus;
+  outlook: OutlookT; briefing: Briefing; sync: SyncStatus; calls: Call[];
   dues: Due[]; rules: Rule[]; pending: Pending[]; customers: Customer[]; activity: Activity[];
   items: { id: number; sku: string; name_en: string; name_ta: string; name_hi: string; category: string; unit: string; price: number; stock: number }[];
   supplier_orders: { id: number; supplier: string; lines: any[]; total: number; created_at: string }[];
@@ -103,6 +105,7 @@ export const api = {
   kinds: () => req<KindLite[]>("/api/area/kinds"),
   areaFit: (lat: number, lon: number, r: number, kind: string | null, budget: number | null) => req<Fit>(`/api/area/fit?lat=${lat}&lon=${lon}&r=${r}${kind ? `&kind=${kind}` : ""}${budget ? `&budget=${budget}` : ""}`),
   onboard: (body: Record<string, unknown>) => post<{ ok: boolean }>("/api/onboard", body),
+  callSuppliers: () => post<{ called: { supplier: string; total: number; summary: string }[]; needs_pin: { supplier: string; total: number; why: string }[] }>("/api/calls", {}),
   cancelBill: (id: number) => post(`/api/bills/counter/${id}/cancel`),
   syncConnect: (body: { url?: string; demo?: boolean }) => post<{ name: string }>("/api/billing/sync/connect", body),
   syncDisconnect: () => post("/api/billing/sync/disconnect"),

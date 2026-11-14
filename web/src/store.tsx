@@ -26,7 +26,7 @@ const session = "s" + Math.random().toString(36).slice(2, 10);
 
 export function AppProvider({ persona, customerId, children }: { persona: "owner" | "customer"; customerId?: number; children: ReactNode }) {
   const [state, setState] = useState<State | null>(null);
-  const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("thunai.lang") as Lang) || "ta-IN");
+  const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("saajhedar.lang") as Lang) || "en-IN");
   const [screen, setScreen] = useState<Screen>("home");
   // Quiet mode: replies are shown as text only, so no speech is requested or paid for.
   const [quiet, setQuietState] = useState(() => { try { return localStorage.getItem("thunai.quiet") === "1"; } catch { return false; } });
@@ -44,7 +44,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
   const abortRef = useRef<AbortController | null>(null);
   const customerRef = useRef(customerId); customerRef.current = customerId;
 
-  const setLang = useCallback((l: Lang) => { setLangState(l); localStorage.setItem("thunai.lang", l); }, []);
+  const setLang = useCallback((l: Lang) => { setLangState(l); localStorage.setItem("saajhedar.lang", l); }, []);
   const toast = useCallback((t: Omit<Toast, "id">) => {
     const id = Date.now() + Math.random();
     setToasts((x) => [...x.slice(-2), { ...t, id }]);
@@ -103,7 +103,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
     const eng = engine.current!;
     if (eng.current === "off") {
       setCaption(null); eng.start();
-      // The first tap of a session: Thunai speaks first with the morning briefing.
+      // The first tap of a session: Saajhedar speaks first with the morning briefing.
       if (persona === "owner" && !briefed.current) { briefed.current = true; runTurn({ event: "The owner has just opened the app for the day. Give the morning briefing." }); }
     }
     else if (eng.current === "speaking") { eng.stopSpeaking(); eng.resume(); }
@@ -148,7 +148,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
   // If the page loads with something already waiting for a PIN, show it.
   useEffect(() => { if (persona === "owner" && !pin && state?.pending.length) setPin(state.pending[0]); }, [state?.pending.length]); // eslint-disable-line
 
-  const go = useCallback((s: Screen) => { setScreen(s); setFocus(null); window.scrollTo({ top: 0 }); }, []);
+  const go = useCallback((s: Screen) => { setScreen(s); setFocus(null); window.scrollTo({ top: 0 }); document.querySelector(".shell")?.scrollTo({ top: 0 }); }, []);
   const closePin = useCallback(() => setPin(null), []);
 
   const value = useMemo<Ctx>(() => ({ quiet, setQuiet, state, lang, setLang, screen, go, focus, setFocus, voice, caption, busy, toggleVoice, say, tellAssistant, stopVoice, levelRef,

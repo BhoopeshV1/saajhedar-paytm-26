@@ -3,10 +3,11 @@
 // The assistant has no way to add, change or remove a rule without a PIN.
 import { all, get } from "./db";
 
-export type RuleKind = "pay_limit" | "new_supplier" | "standing_guard" | "credit_limit";
+export type RuleKind = "order_limit" | "pay_limit" | "new_supplier" | "standing_guard" | "credit_limit";
 export type Rule = { id: number; kind: RuleKind; params: any; spoken: string; active: number; signed_at: string };
 
 export const RULE_KINDS: Record<RuleKind, { job: "pay" | "stock" | "collect"; title: string }> = {
+  order_limit: { job: "stock", title: "Phone orders" },
   pay_limit: { job: "pay", title: "Spending limit" },
   new_supplier: { job: "pay", title: "New suppliers" },
   standing_guard: { job: "stock", title: "Standing orders" },
@@ -41,6 +42,16 @@ export function judgePayment(bill: { supplier_id: number; amount: number; suppli
   return { decision: "ask", rule: limit, why: `₹${payAmount.toLocaleString("en-IN")} is above your limit of ₹${Number(limit.params.max_amount).toLocaleString("en-IN")}. Your rule: "${limit.spoken}"` };
 }
 
+// May Saajhedar phone this supplier and place an order of this size unasked?
+export function judgeOrder(supplierId: number, supplier: string, total: number): Verdict {
+  const limits = activeRules().filter((r) => r.kind === "order_limit");
+  const limit = limits.find((r) => r.params.supplier_id === supplierId) ?? limits.find((r) => r.params.supplier_id == null);
+  const amt = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
+  if (!limit) return { decision: "ask", rule: null, why: `There is no ordering rule for ${supplier}, so this call needs your PIN.` };
+  if (total <= limit.params.max_amount) return { decision: "allow", rule: limit, why: `Inside your ordering limit of ${amt(limit.params.max_amount)}. Your rule: "${limit.spoken}"` };
+  return { decision: "ask", rule: limit, why: `${amt(total)} is above your ordering limit of ${amt(limit.params.max_amount)}. Your rule: "${limit.spoken}"` };
+}
+
 // May this customer take more goods on credit?
 export function judgeCredit(customerId: number, extra: number): Verdict {
   const rule = activeRules().find((r) => r.kind === "credit_limit");
@@ -65,6 +76,7 @@ export function trippedGuards(health: { id: number; item_id: number; leftover: n
 export function validateRule(kind: string, params: any): { ok: true; params: any } | { ok: false; error: string } {
   const num = (v: any) => (typeof v === "number" && isFinite(v) && v >= 0 ? v : null);
   switch (kind) {
+    case "order_limit":
     case "pay_limit": {
       const max = num(params?.max_amount);
       if (max == null || max > 200000) return { ok: false, error: "max_amount must be a rupee amount up to 2,00,000" };

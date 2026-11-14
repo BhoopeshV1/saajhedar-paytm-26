@@ -1,5 +1,5 @@
 // Keeping another billing app in step. Most small shops have no billing app and
-// Thunai's own bill book is the record. For a shop that does run one (or sends
+// Saajhedar's own bill book is the record. For a shop that does run one (or sends
 // books to an accountant), every sale, supplier bill and payment made here is
 // owed to that app, or its stock count drifts.
 //
@@ -60,8 +60,8 @@ export async function flush() {
       const body = JSON.stringify({ id: `thunai-${row.id}`, event: row.kind, at: row.at, ref: row.ref, data: JSON.parse(row.payload) });
       try {
         const res = await fetch(t.url, { method: "POST", signal: AbortSignal.timeout(8000), body,
-          headers: { "Content-Type": "application/json", "User-Agent": "thunai-prototype", "X-Thunai-Event": row.kind,
-            "X-Thunai-Signature": "sha256=" + createHmac("sha256", t.secret).update(body).digest("hex") } });
+          headers: { "Content-Type": "application/json", "User-Agent": "thunai-prototype", "X-Saajhedar-Event": row.kind,
+            "X-Saajhedar-Signature": "sha256=" + createHmac("sha256", t.secret).update(body).digest("hex") } });
         if (!res.ok) throw new Error(`The billing app answered ${res.status}`);
         run("UPDATE outbox SET status = 'sent', sent_at = ?, tries = tries + 1, error = '' WHERE id = ?", nowIso(), row.id);
       } catch (err) {
@@ -86,11 +86,11 @@ export function status() {
 export function startSync() { setInterval(flush, 60_000); }
 
 // ---------- a stand-in billing app, so the push can be seen working ----------
-// It keeps its own stock count, changed only by what Thunai sends it.
+// It keeps its own stock count, changed only by what Saajhedar sends it.
 const received: { at: string; event: string; ref: string }[] = [];
 const stock = new Map<string, { item: string; unit: string; change: number }>();
 export function demoReceive(body: any) {
-  if (!body?.event || !body?.data) throw new SyncError("Not a Thunai entry.");
+  if (!body?.event || !body?.data) throw new SyncError("Not a Saajhedar entry.");
   if (received.some((r) => r.ref === body.ref && r.event === body.event)) return { ok: true, duplicate: true };
   received.unshift({ at: nowIso(), event: body.event, ref: body.ref });
   const sign = body.event === "sale" ? -1 : body.event === "purchase_bill" || body.event === "sale_cancelled" ? 1 : 0;
@@ -127,7 +127,7 @@ export function exportFile(what: What, format: "xlsx" | "csv" | "tally"): { name
     return sheet(rows, `thunai-stock-${stamp}`, format);
   }
   const docs = vouchers(what);
-  if (!docs.length) throw new SyncError(what === "sales" ? "No bills have been made in Thunai yet." : "There are no supplier bills yet.");
+  if (!docs.length) throw new SyncError(what === "sales" ? "No bills have been made in Saajhedar yet." : "There are no supplier bills yet.");
   if (format === "tally") {
     const xml = `<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>\n` +
       docs.map((d) => `<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="${d.type}" ACTION="Create"><DATE>${d.date.replace(/-/g, "")}</DATE><VOUCHERTYPENAME>${d.type}</VOUCHERTYPENAME><VOUCHERNUMBER>${esc(d.ref)}</VOUCHERNUMBER><REFERENCE>${esc(d.ref)}</REFERENCE><PARTYLEDGERNAME>${esc(d.party)}</PARTYLEDGERNAME>` +
@@ -143,6 +143,6 @@ export function exportFile(what: What, format: "xlsx" | "csv" | "tally"): { name
 function sheet(rows: Record<string, unknown>[], name: string, format: "xlsx" | "csv") {
   const ws = XLSX.utils.json_to_sheet(rows);
   if (format === "csv") return { name: `${name}.csv`, type: "text/csv; charset=utf-8", body: "﻿" + XLSX.utils.sheet_to_csv(ws) };
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Thunai");
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Saajhedar");
   return { name: `${name}.xlsx`, type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", body: new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" })) };
 }

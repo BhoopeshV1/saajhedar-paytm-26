@@ -117,6 +117,14 @@ export function migrate() {
     status TEXT NOT NULL DEFAULT 'waiting',       -- waiting | sent | failed
     tries INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '', sent_at TEXT
   );
+  CREATE TABLE IF NOT EXISTS calls (              -- phone orders placed with suppliers
+    id INTEGER PRIMARY KEY, at TEXT NOT NULL, supplier_id INTEGER, supplier TEXT NOT NULL,
+    mode TEXT NOT NULL DEFAULT 'simulated',       -- simulated | sarvam
+    status TEXT NOT NULL, via TEXT NOT NULL DEFAULT '',
+    lines TEXT NOT NULL DEFAULT '[]', total INTEGER NOT NULL DEFAULT 0,
+    transcript TEXT NOT NULL DEFAULT '[]', summary TEXT NOT NULL DEFAULT '',
+    order_id INTEGER, bill_id INTEGER
+  );
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `);
 }

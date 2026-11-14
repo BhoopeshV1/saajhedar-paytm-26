@@ -28,9 +28,9 @@ export function BillBook() {
         <h2 className="card-title">{L("Today's bill book", "இன்றைய பில் புத்தகம்", "आज की बिल बुक")}</h2>
         <span className="billbook-sum">{inr(sum)}</span>
       </div>
-      <p className="hint">{L("Call out what goes in the bag: “one kilo sugar, two Parle-G, cash”. Thunai writes the bill and takes it out of stock.",
-        "பையில் போடுவதைச் சொல்லுங்கள்: “ஒரு கிலோ சர்க்கரை, இரண்டு பார்லே-ஜி, ரொக்கம்”. துணை பில் எழுதி இருப்பைக் குறைக்கும்.",
-        "थैले में जो जा रहा है बोलिए: “एक किलो चीनी, दो पारले-जी, नकद”। थुनै बिल बनाकर स्टॉक घटा देगा।")}</p>
+      <p className="hint">{L("Call out what goes in the bag: “one kilo sugar, two Parle-G, cash”. Saajhedar writes the bill and takes it out of stock.",
+        "பையில் போடுவதைச் சொல்லுங்கள்: “ஒரு கிலோ சர்க்கரை, இரண்டு பார்லே-ஜி, ரொக்கம்”. சாஜேதார் பில் எழுதி இருப்பைக் குறைக்கும்.",
+        "थैले में जो जा रहा है बोलिए: “एक किलो चीनी, दो पारले-जी, नकद”। साझेदार बिल बनाकर स्टॉक घटा देगा।")}</p>
       {bills.length === 0 ? <p className="empty">{L("No bills yet today.", "இன்று இன்னும் பில் இல்லை.", "आज अभी कोई बिल नहीं।")}</p> : (
         <ul className="bills">
           {bills.slice(0, 6).map((o) => (

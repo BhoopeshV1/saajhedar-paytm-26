@@ -336,7 +336,7 @@ export function Area() {
             <span className="verdict-line">{c ? `${L(c.label, c.ta, c.hi)}: ${word}` : L("Looking for the right shop to open", "எந்தக் கடை என்று தேடுகிறோம்", "सही दुकान की तलाश")}</span>
             {c && <p>{c.here} here, about {Math.round(c.expected)} in similar areas. The map below shows only these{c.here ? "" : ", and there are none"}. Tap a kind underneath to compare.</p>}
             <div className="btn-row">
-              {health?.claude && <button className="btn btn-light" disabled={busy} onClick={() => say(askFor(plan))}>{L("Ask Thunai", "துணையிடம் கேள்", "थुनै से पूछें")}</button>}
+              {health?.claude && <button className="btn btn-light" disabled={busy} onClick={() => say(askFor(plan))}>{L("Ask Saajhedar", "சாஜேதாரிடம் கேள்", "साझेदार से पूछें")}</button>}
               <button className="btn btn-light" onClick={() => { handoff.setup = true; window.dispatchEvent(new Event("thunai:welcome")); }}>{L("Start this shop", "இந்தக் கடையைத் தொடங்கு", "यह दुकान शुरू करें")}</button>
             </div>
             <button className="verdict-x" onClick={() => { handoff.plan = null; setPlan(null); setOnly(null); }}>{L("Clear the plan", "திட்டத்தை நீக்கு", "योजना हटाएँ")}</button>
@@ -389,7 +389,7 @@ export function Area() {
       {report && (
         <section className="card ask">
           <h2 className="card-title">{{ "en-IN": "Thinking of opening a shop here?", "ta-IN": "இங்கே கடை தொடங்க நினைக்கிறீர்களா?", "hi-IN": "यहाँ दुकान खोलने की सोच रहे हैं?" }[lang]}</h2>
-          <p className="muted">{{ "en-IN": "Pick what you can invest. Thunai weighs what is thin here, what brings people, and the rough cost.", "ta-IN": "முதலீட்டைத் தேர்ந்தெடுங்கள். இங்கே எது குறைவு, மக்களை எது ஈர்க்கிறது, தோராயச் செலவு ஆகியவற்றை துணை பார்க்கும்.", "hi-IN": "निवेश चुनिए। थुनई देखेगा कि यहाँ क्या कम है, लोग क्यों आते हैं और मोटा ख़र्च कितना है।" }[lang]}</p>
+          <p className="muted">{{ "en-IN": "Pick what you can invest. Saajhedar weighs what is thin here, what brings people, and the rough cost.", "ta-IN": "முதலீட்டைத் தேர்ந்தெடுங்கள். இங்கே எது குறைவு, மக்களை எது ஈர்க்கிறது, தோராயச் செலவு ஆகியவற்றை சாஜேதார் பார்க்கும்.", "hi-IN": "निवेश चुनिए। साझेदार देखेगा कि यहाँ क्या कम है, लोग क्यों आते हैं और मोटा ख़र्च कितना है।" }[lang]}</p>
           <div className="budgets">
             {[1, 3, 5, 10].map((l) => (
               <button key={l} className="budget" disabled={busy} onClick={() => say({
@@ -414,7 +414,7 @@ export function Area() {
                   </button>
                 </li>
               ))}
-              <p className="fine">Reasoned by Thunai from the listings on this screen. Setup costs are illustrative ranges. This is a starting point, not a promise of income.</p>
+              <p className="fine">Reasoned by Saajhedar from the listings on this screen. Setup costs are illustrative ranges. This is a starting point, not a promise of income.</p>
             </ol>
           )}
         </section>
