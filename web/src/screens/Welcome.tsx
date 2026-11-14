@@ -30,12 +30,24 @@ function Locality({ value, onPick, L }: { value: AreaHit | null; onPick: (h: Are
 
 // Shown every time the app opens, over whatever screen is loading underneath.
 // It stays until Proceed is tapped.
+// Laptop phone frame only: a compact language picker beside the camera cut-out.
+function LangDrop({ dark }: { dark: boolean }) {
+  const { lang, setLang } = useApp();
+  return (
+    <label className={`lang-drop ${dark ? "lang-drop-dark" : ""}`}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18" /></svg>
+      <span>{lang.slice(0, 2).toUpperCase()}</span>
+      <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value as typeof lang)}>{LANGS.map(([l, n]) => <option key={l} value={l}>{n}</option>)}</select>
+    </label>
+  );
+}
+
 export function Splash({ onDone }: { onDone: () => void }) {
   const { lang, setLang } = useApp();
   const L = (en: string, ta: string, hi: string) => (lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en);
   return (
     <div className="splash">
-      <select className="lang-drop splash-drop" aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value as typeof lang)}>{LANGS.map(([l, n]) => <option key={l} value={l}>{n}</option>)}</select>
+      <LangDrop dark={true} />
       <div className="seg lang-seg splash-lang">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
       <span className="soap" aria-hidden="true"><i className="b-rim" /><i className="b-core" /><i className="b-shine" /></span>
       <span className="splash-name">Saajhedar</span>
@@ -99,7 +111,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     <div className="welcome-top">
       {step === "start" ? <span />
         : <button className="icon-btn" onClick={() => setStep(prev[step])} aria-label="Back"><Back /></button>}
-      <select className="lang-drop" aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value as typeof lang)}>{LANGS.map(([l, n]) => <option key={l} value={l}>{n}</option>)}</select>
+      <LangDrop dark={false} />
       <div className="seg lang-seg">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
     </div>
   );
