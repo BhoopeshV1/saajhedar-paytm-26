@@ -600,7 +600,7 @@ div.pill { padding-right: 8px; }
     .bottomnav { height: calc(var(--nav-h) + 14px); padding-bottom: 14px; }
     .toasts { top: 112px; }
     .lang-seg { display: none; }
-    .lang-drop { display: inline-flex; align-items: center; gap: 5px; position: fixed; z-index: 40; top: 11px; right: 26px; height: 31px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+    .lang-drop { display: inline-flex; align-items: center; gap: 5px; position: fixed; z-index: 40; top: 11px; left: 257px; right: 21px; width: fit-content; margin-inline: auto; height: 31px; padding: 0 12px; border-radius: 999px; cursor: pointer;
       font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--navy); background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.35)); border: 1px solid rgba(255,255,255,.9);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 4px 14px -6px rgba(0, 41, 112, .45); backdrop-filter: blur(10px) saturate(1.4); }
     .lang-drop-dark { color: #fff; background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.08)); border-color: rgba(255,255,255,.32); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 6px 16px -8px rgba(0, 8, 36, .8); }
