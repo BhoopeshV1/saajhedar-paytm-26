@@ -27,8 +27,9 @@ function Shell() {
   const [welcome, setWelcome] = useState(() => !seen());
   const [splash, setSplash] = useState(true);
   useEffect(() => { const on = () => { setMenu(false); setWelcome(true); }; window.addEventListener("thunai:welcome", on); return () => window.removeEventListener("thunai:welcome", on); }, []);
-  if (welcome) return <div className="shell welcome-shell"><Welcome onDone={(how) => { try { localStorage.setItem("thunai_setup", how); } catch {} setWelcome(false); }} /><Toasts />{splash && <Splash onDone={() => setSplash(false)} />}</div>;
+  if (welcome) return <><div className="shell welcome-shell"><Welcome onDone={(how) => { try { localStorage.setItem("thunai_setup", how); } catch {} setWelcome(false); }} /><Toasts />{splash && <Splash onDone={() => setSplash(false)} />}</div></>;
   return (
+    <>
     <div className="shell">
       <AssistantBar onMenu={() => setMenu(true)} />
       <main key={screen}>
@@ -44,9 +45,10 @@ function Shell() {
       <Menu open={menu} onClose={() => setMenu(false)} />
       <PinSheet />
       <Toasts />
-      <LayoutToggle />
       {splash && <Splash onDone={() => setSplash(false)} />}
     </div>
+    <LayoutToggle />
+    </>
   );
 }
 

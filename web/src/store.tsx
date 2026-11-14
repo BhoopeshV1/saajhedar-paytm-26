@@ -148,7 +148,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
   // If the page loads with something already waiting for a PIN, show it.
   useEffect(() => { if (persona === "owner" && !pin && state?.pending.length) setPin(state.pending[0]); }, [state?.pending.length]); // eslint-disable-line
 
-  const go = useCallback((s: Screen) => { setScreen(s); setFocus(null); window.scrollTo({ top: 0 }); document.querySelector(".shell")?.scrollTo({ top: 0 }); }, []);
+  const go = useCallback((s: Screen) => { setScreen(s); setFocus(null); window.scrollTo({ top: 0 }); document.querySelector(".shell > main")?.scrollTo({ top: 0 }); }, []);
   const closePin = useCallback(() => setPin(null), []);
 
   const value = useMemo<Ctx>(() => ({ quiet, setQuiet, state, lang, setLang, screen, go, focus, setFocus, voice, caption, busy, toggleVoice, say, tellAssistant, stopVoice, levelRef,

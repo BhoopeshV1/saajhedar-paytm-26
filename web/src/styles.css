@@ -573,23 +573,46 @@ div.pill { padding-right: 8px; }
 .turn-saajhedar b { color: var(--cyan-deep); }
 .rail-brand, .rail-only, .layout-toggle { display: none; }
 
-/* ---------- Laptop and desktop ---------- */
+/* ---------- Laptop and desktop ----------
+   The app sits inside a device frame: a tablet for the wide layout, a phone for
+   the narrow one. The frame is the containing block for everything fixed. */
 @media (min-width: 960px) {
   body { background: radial-gradient(900px 600px at 85% -5%, rgba(0,185,241,.55) 0, rgba(0,185,241,0) 62%), radial-gradient(700px 520px at 5% 105%, rgba(40,120,255,.5) 0, rgba(40,120,255,0) 60%), linear-gradient(155deg, #001B52 0, #002970 38%, #0A4DB0 100%) fixed; min-height: 100dvh; }
-  .layout-toggle { display: inline-flex; position: fixed; top: 24px; right: 24px; z-index: 60; padding: 4px; gap: 2px; border-radius: 999px; background: rgba(255,255,255,.14); backdrop-filter: blur(8px); }
-  .layout-toggle button { width: 40px; height: 36px; border-radius: 999px; display: grid; place-items: center; color: #CFE3FF; }
+  body { overflow: hidden; height: 100dvh; display: grid; place-items: center; }
+  #root { display: contents; }
+  .layout-toggle { display: inline-flex; position: fixed; bottom: 14px; right: 14px; z-index: 80; padding: 4px; gap: 2px; border-radius: 999px; background: rgba(255,255,255,.14); backdrop-filter: blur(8px); }
+  .layout-toggle button { width: 44px; height: 36px; border-radius: 999px; display: grid; place-items: center; color: #CFE3FF; }
   .layout-toggle button[aria-pressed="true"] { background: #fff; color: var(--navy); }
-  :root[data-layout="phone"] .shell { box-shadow: 0 30px 80px -30px rgba(0, 10, 40, .7); }
-  :root:not([data-layout="phone"]) {
-    body { overflow: hidden; }
-    .shell { max-width: 1200px; margin: 24px auto; height: calc(100dvh - 48px); min-height: 0; overflow-y: auto; scrollbar-width: thin; border-radius: 30px; padding: 0 0 36px 248px; box-shadow: 0 30px 80px -30px rgba(0, 10, 40, .7); }
-    .shell.welcome-shell, .shell.customer { max-width: 520px; padding-left: 0; }
-    .topbar { border-radius: 0 30px 0 0; padding: 18px 28px 14px; }
+
+  .shell { transform: translateZ(0); overflow: hidden; display: flex; flex-direction: column; min-height: 0; padding-bottom: 0; margin: 0; flex: none; background: linear-gradient(180deg, var(--sky) 0, #EEF7FC 260px, var(--paper) 520px), var(--paper); }
+  .shell > main, .shell.welcome-shell > :first-child, .shell.customer > :first-child { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+  .shell > main::-webkit-scrollbar, .shell > :first-child::-webkit-scrollbar { display: none; }
+
+  /* Phone frame */
+  :root[data-layout="phone"] .shell, .shell.welcome-shell, .shell.customer {
+    width: 402px; max-width: 402px; height: 874px; zoom: var(--fit-phone, 1); border-radius: 54px;
+    box-shadow: 0 0 0 3px #2C3344, 0 0 0 12px #0A0E18, 0 0 0 13.5px #4A5368, 0 40px 80px -24px rgba(0, 8, 36, .85);
+    &::before { content: ""; position: fixed; z-index: 70; top: 11px; left: 50%; transform: translateX(-50%); width: 112px; height: 31px; border-radius: 20px; background: #05070C; pointer-events: none; }
+    &::after { content: ""; position: fixed; z-index: 70; bottom: 7px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: rgba(5, 15, 40, .45); pointer-events: none; }
+    > main { padding-bottom: calc(var(--nav-h) + 48px); }
+    .topbar { position: static; padding-top: 52px; }
+    .welcome, > :first-child:not(.topbar) { padding-top: 46px; }
+    .bottomnav { height: calc(var(--nav-h) + 14px); padding-bottom: 14px; }
+    .toasts { top: 112px; }
+  }
+
+  /* Tablet frame */
+  :root:not([data-layout="phone"]) body:has(.shell:not(.welcome-shell):not(.customer))::before { content: ""; position: fixed; z-index: 70; top: calc(50dvh - 427px * var(--fit-tab, 1)); left: 50%; transform: translateX(-50%); zoom: var(--fit-tab, 1); width: 7px; height: 7px; border-radius: 50%; background: #2A3348; box-shadow: 0 0 0 1.5px #161C2A; }
+  :root:not([data-layout="phone"]) .shell:not(.welcome-shell):not(.customer) {
+    width: 1194px; max-width: none; height: 834px; zoom: var(--fit-tab, 1); border-radius: 26px; padding-left: 248px;
+    box-shadow: 0 0 0 2px #2C3344, 0 0 0 15px #0A0E18, 0 0 0 16.5px #4A5368, 0 40px 80px -24px rgba(0, 8, 36, .85);
+    > main { padding-bottom: 36px; }
+    .topbar { position: static; padding: 18px 28px 14px; }
     .topbar .pill, .topbar div.pill { max-width: 620px; }
     .screen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 18px; padding: 6px 28px 0; }
     .screen > .title, .screen > .lead-text, .screen > .rulestrip, .screen > .search, .screen > .area-bar, .screen > .map-card, .screen > .verdict, .screen > .empty, .screen > .hello, .screen > header, .screen > .section { grid-column: 1 / -1; }
-    .bottomnav { left: max(24px, calc(50% - 600px)); top: 24px; bottom: 24px; transform: none; width: 232px; max-width: none; height: auto; padding: 22px 14px; display: flex; flex-direction: column; align-items: stretch; gap: 4px;
-      border-radius: 30px 0 0 30px; background: #fff; box-shadow: 1px 0 0 var(--line); }
+    .bottomnav { left: 0; top: 0; bottom: 0; transform: none; width: 248px; max-width: none; height: auto; padding: 24px 14px; display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+      border-radius: 0; background: #fff; box-shadow: 1px 0 0 var(--line); }
     .rail-brand { display: block; font-size: 24px; font-weight: 780; letter-spacing: -.03em; color: var(--navy); padding: 4px 12px 14px; }
     .rail-only { display: contents; }
     .tab { flex-direction: row; justify-content: flex-start; gap: 14px; padding: 11px 12px; border-radius: 14px; }
@@ -601,7 +624,7 @@ div.pill { padding-right: 8px; }
     .sheet-scrim { align-items: center; }
     .sheet { border-radius: 28px; max-width: 520px; }
     .sheet-grip { display: none; }
-    .toasts { left: auto; right: max(40px, calc(50% - 580px)); transform: none; top: 100px; }
+    .toasts { left: auto; right: 28px; transform: none; top: 96px; }
     .splash { background: radial-gradient(900px 600px at 50% 36%, #0B4AA8 0, var(--navy) 55%, #001A4D 100%); }
     .splash-go { max-width: 360px; }
   }
