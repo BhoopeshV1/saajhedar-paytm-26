@@ -1,0 +1,12 @@
+Invoice No,Date,Party Name,Type,Item Name,Qty,Unit,Price/Unit,Amount
+S-4101,13/11/2026,Cash Sale,Sale,Agal vilakku,60,piece,6,360
+,,,,Lamp oil,4,litre,120,480
+,,,,Cotton wicks,10,packet,15,150
+S-4102,13/11/2026,Revathi,Sale,Pori,3,kg,90,270
+,,,,Jaggery,2,kg,78,156
+S-4103,13/11/2026,Cash Sale,Sale,Camphor,6,box,25,150
+,,,,Gingelly oil,2,litre,310,620
+,,,,Incense sticks,5,packet,20,100
+S-4104,14/11/2026,Cash Sale,Sale,Agal vilakku,90,piece,6,540
+,,,,Lamp oil,6,litre,120,720
+,,,,Pori,4,kg,90,360

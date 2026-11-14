@@ -1,0 +1,2 @@
+downloaded 559702034 bytes
+Terminated                 osmium extract -b 80.02,12.78,80.36,13.26 --strategy=complete_ways -O -o chennai.osm.pbf southern.osm.pbf

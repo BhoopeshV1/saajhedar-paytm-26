@@ -1,0 +1,32 @@
+[ 0:00] Started osmium extract
+[ 0:00]   osmium version 1.19.0
+[ 0:00]   libosmium version 2.23.0
+[ 0:00] Command line options and default settings:
+[ 0:00]   input options:
+[ 0:00]     file name: southern.osm.pbf
+[ 0:00]     file format: 
+[ 0:00]   output options:
+[ 0:00]     file name: chennai.osm.pbf
+[ 0:00]     file format: 
+[ 0:00]     generator: osmium/1.19.0
+[ 0:00]     overwrite: yes
+[ 0:00]     fsync: no
+[ 0:00]   strategy options:
+[ 0:00]     strategy: simple
+[ 0:00]     with history: no
+[ 0:00]   other options:
+[ 0:00]     config file: 
+[ 0:00]     output directory: 
+[ 0:00]     attributes to clean: (none)
+[ 0:00] 
+[ 0:00] Extracts:
+[ 0:00] [01] Output:      chennai.osm.pbf
+[ 0:00]      Format:      PBF
+[ 0:00]      Description: 
+[ 0:00]      Envelope:    (80.02,12.78,80.36,13.26)
+[ 0:00]      Type:        bbox
+[ 0:00]      Geometry:    BOX(80.02 12.78,80.36 13.26)
+[ 0:00] 
+[ 0:00] Running 'simple' strategy in one pass...
+[ 0:26] Peak memory used: 2148 MBytes
+[ 0:26] Done.

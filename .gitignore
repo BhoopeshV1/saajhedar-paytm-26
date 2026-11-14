@@ -1,0 +1,8 @@
+.env
+node_modules
+web/dist
+data/raw/*.json
+data/*.sqlite*
+data/raw/*.pbf
+data/raw/*.geojsonseq
+server.log
