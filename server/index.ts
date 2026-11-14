@@ -1,5 +1,6 @@
 // HTTP server: JSON API, server-sent events, the voice turn endpoint, and the
 // built web app. Run from the app folder so Bun picks up .env.
+import { gate } from "./gate";
 import { callVoice } from "./callvoice";
 import path from "node:path";
 import fs from "node:fs";
@@ -123,7 +124,8 @@ const num = (v: string | null, d?: number) => { const n = Number(v); if (v == nu
 
 Bun.serve({
   port: PORT, hostname: "0.0.0.0", idleTimeout: 120,
-  async fetch(req) {
+  async fetch(req, server) {
+    const blocked = await gate(req, server.requestIP(req)?.address); if (blocked) return blocked;
     const url = new URL(req.url); const p = url.pathname; const m = req.method;
     if (!p.startsWith("/api/")) return serveStatic(p);
     try {
