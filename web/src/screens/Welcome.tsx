@@ -152,17 +152,17 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     <div className="welcome">
       {top}
       <h1 className="brand">Saajhedar</h1>
-      <p className="brand-sub">{L("A partner for your shop. It sells, stocks, pays and collects, by voice.", "உங்கள் கடைக்கு ஒரு துணை. குரலால் விற்கும், சரக்கு வாங்கும், பணம் கட்டும், வசூலிக்கும்.", "आपकी दुकान का साथी। बोलकर बेचता, माल मँगाता, भुगतान और वसूली करता है।")}</p>
+      <p className="brand-sub">{L("Your shop's partner, by voice.", "குரலால் இயங்கும் உங்கள் கடையின் துணை.", "बोलकर चलने वाला, आपकी दुकान का साथी।")}</p>
       <button className="door" onClick={() => { setFresh(false); setStep("phone"); }}>
         <span className="door-title">{L("I run a shop", "எனக்கு ஒரு கடை இருக்கிறது", "मेरी दुकान है")}</span><IconChevron />
-        <span className="door-text">{L("Link your merchant account and set up in about two minutes.", "உங்கள் வணிகக் கணக்கை இணைத்து இரண்டு நிமிடத்தில் தொடங்குங்கள்.", "अपना मर्चेंट खाता जोड़ें, दो मिनट में शुरू करें।")}</span>
+        <span className="door-text">{L("Set up in two minutes.", "இரண்டு நிமிடத்தில் தொடங்குங்கள்.", "दो मिनट में शुरू करें।")}</span>
       </button>
       <button className="door door-fence" onClick={() => setStep("fence")}>
-        <span className="door-title">{L("Still on the fence about starting one?", "கடை தொடங்கலாமா என்று யோசனையா?", "दुकान खोलें या नहीं, सोच रहे हैं?")}</span><IconChevron />
-        <span className="door-text">{L("Tell us the shop you have in mind and what you can invest. See who is already there and what the area is missing.", "மனதில் உள்ள கடையையும் முதலீட்டையும் சொல்லுங்கள். அங்கே யார் இருக்கிறார்கள், எது குறைவு என்று பாருங்கள்.", "मन में जो दुकान है और जितना लगा सकते हैं, बताइए। देखिए वहाँ कौन है और क्या कम है।")}</span>
+        <span className="door-title">{L("Thinking of opening one?", "கடை தொடங்க யோசனையா?", "दुकान खोलने की सोच रहे हैं?")}</span><IconChevron />
+        <span className="door-text">{L("See who is already there, and what the area is missing.", "அங்கே யார் இருக்கிறார்கள், எது குறைவு என்று பாருங்கள்.", "देखिए वहाँ कौन है और क्या कम है।")}</span>
       </button>
       <button className="link" onClick={() => onDone("demo")}>{L("Skip to the demo shop", "மாதிரிக் கடைக்குச் செல்", "डेमो दुकान देखें")}</button>
-      <p className="fine">{L("Not a Paytm product. Account linking, payments and loans here are simulated.", "இது Paytm தயாரிப்பு அல்ல. கணக்கு இணைப்பு, பணம், கடன் அனைத்தும் மாதிரி.", "यह Paytm का उत्पाद नहीं है। खाता जोड़ना, भुगतान और लोन यहाँ नकली हैं।")}</p>
+      <p className="fine">{L("Not a Paytm product. Payments and loans are simulated.", "இது Paytm தயாரிப்பு அல்ல. பணம், கடன் அனைத்தும் மாதிரி.", "यह Paytm का उत्पाद नहीं है। भुगतान और लोन नकली हैं।")}</p>
     </div>
   );
 
