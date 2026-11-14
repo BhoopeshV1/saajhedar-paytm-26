@@ -628,7 +628,7 @@ div.pill { padding-right: 8px; }
 .turn { font-size: 14px; line-height: 1.45; color: var(--ink); }
 .turn b { display: block; font-size: 12px; color: var(--muted); font-weight: 700; }
 .turn-saajhedar b { color: var(--cyan-deep); }
-.rail-brand, .rail-only, .layout-toggle, .lang-drop, .team-badge { display: none; }
+.rail-brand, .rail-only, .layout-toggle, .lang-drop, .team-badge, .device-keys { display: none; }
 
 /* ---------- Laptop and desktop ----------
    The app sits inside a device frame: a tablet for the wide layout, a phone for
@@ -695,6 +695,14 @@ div.pill { padding-right: 8px; }
     .lang-menu button:hover, .lang-menu button[aria-selected="true"] { background: rgba(255,255,255,.22); }
     .lang-drop:not(.lang-drop-dark) .lang-menu button:hover, .lang-drop:not(.lang-drop-dark) .lang-menu button[aria-selected="true"] { background: rgba(0, 41, 112, .08); }
   }
+
+  /* Side keys of the phone frame: action, volume up, volume down on the left; power on the right */
+  :root[data-layout="phone"] .device-keys, body:has(.welcome-shell, .customer) .device-keys { display: block; position: fixed; top: 50%; left: 50%; width: 436px; height: 874px; translate: -50% -50%; zoom: var(--fit-phone, 1); pointer-events: none; }
+  .device-keys i { position: absolute; width: 6px; border-radius: 3px 0 0 3px; background: linear-gradient(90deg, #8C98B4 0, #4A5670 40%, #1B2233 100%); left: 0; }
+  .device-keys i:nth-child(1) { top: 138px; height: 30px; }
+  .device-keys i:nth-child(2) { top: 196px; height: 58px; }
+  .device-keys i:nth-child(3) { top: 268px; height: 58px; }
+  .device-keys i:nth-child(4) { left: auto; right: 0; top: 232px; height: 92px; border-radius: 0 3px 3px 0; background: linear-gradient(270deg, #8C98B4 0, #4A5670 40%, #1B2233 100%); }
 
   /* Tablet frame */
   :root:not([data-layout="phone"]) body:has(.shell:not(.welcome-shell):not(.customer))::before { content: ""; position: fixed; z-index: 70; top: calc(50dvh - 368px * var(--fit-tab, 1)); left: 50%; transform: translateX(-50%); zoom: var(--fit-tab, 1); width: 7px; height: 7px; border-radius: 50%; background: #2A3348; box-shadow: 0 0 0 1.5px #161C2A; }

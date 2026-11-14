@@ -40,7 +40,8 @@ new MutationObserver((changes) => {
 function Root() {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => { const on = () => setHash(location.hash); addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
-  return hash.startsWith("#/order") ? <CustomerApp /> : <OwnerApp />;
+  // The side keys of the phone frame, drawn only on laptops when the phone frame is showing.
+  return <><div className="device-keys" aria-hidden="true"><i /><i /><i /><i /></div>{hash.startsWith("#/order") ? <CustomerApp /> : <OwnerApp />}</>;
 }
 
 createRoot(document.getElementById("root")!).render(<StrictMode><Root /></StrictMode>);
