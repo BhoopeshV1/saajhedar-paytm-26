@@ -20,6 +20,22 @@ function fitDevice() {
 }
 fitDevice(); addEventListener("resize", fitDevice);
 
+// Sheets unmount the moment they close. To let them slide away, a lifeless copy
+// of a removed sheet is put back for the length of the closing animation.
+new MutationObserver((changes) => {
+  for (const c of changes) for (const n of c.removedNodes) {
+    if (!(n instanceof HTMLElement) || !n.classList.contains("sheet-scrim") || n.classList.contains("closing")) continue;
+    const home = c.target as HTMLElement;
+    if (!home.isConnected) continue;
+    const ghost = n.cloneNode(true) as HTMLElement;
+    ghost.classList.add("closing"); ghost.inert = true; ghost.setAttribute("aria-hidden", "true");
+    home.appendChild(ghost);
+    const done = () => ghost.remove();
+    ghost.addEventListener("animationend", (e) => { if (e.target === ghost) done(); });
+    setTimeout(done, 500);
+  }
+}).observe(document.body, { childList: true, subtree: true });
+
 function Root() {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => { const on = () => setHash(location.hash); addEventListener("hashchange", on); return () => removeEventListener("hashchange", on); }, []);
