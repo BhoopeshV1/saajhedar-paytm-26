@@ -680,6 +680,7 @@ div.pill { padding-right: 8px; }
     &::before { content: ""; position: fixed; z-index: 70; top: 11px; left: 50%; transform: translateX(-50%); width: 112px; height: 31px; border-radius: 20px; background: #05070C; pointer-events: none; }
     &::after { content: ""; position: fixed; z-index: 70; bottom: 7px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 3px; background: rgba(5, 15, 40, .45); pointer-events: none; }
     > main { padding-bottom: calc(var(--nav-h) + 48px); }
+    .sheet { max-height: 800px; }
     .topbar { position: static; padding-top: 52px; }
     .welcome, > :first-child:not(.topbar) { padding-top: 46px; }
     .bottomnav { height: calc(var(--nav-h) + 14px); padding-bottom: 14px; }
@@ -725,7 +726,7 @@ div.pill { padding-right: 8px; }
     .tab-badge { top: -6px; right: -10px; }
     .talk { order: 99; margin: auto auto 6px; align-self: center; box-shadow: none; }
     .sheet-scrim { align-items: center; }
-    .sheet { border-radius: 28px; max-width: 520px; animation: pop .3s cubic-bezier(.22, 1, .36, 1) both; }
+    .sheet { border-radius: 28px; max-width: 520px; max-height: 664px; padding: 26px 26px 24px; animation: pop .3s cubic-bezier(.22, 1, .36, 1) both; }
     .sheet-scrim.closing .sheet { animation: pop-out .22s ease-in both; }
     .sheet-grip { display: none; }
     .toasts { left: calc(50% + 112px); bottom: 24px; }
