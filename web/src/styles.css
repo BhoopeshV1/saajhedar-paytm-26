@@ -505,7 +505,11 @@ section > .card + .card, section > .gaps + .fine { margin-top: 10px; }
 .alt .row-detail { grid-column: 2 / -1; }
 
 /* Splash, plan card, starter kit */
-.splash { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #fff;
+@media (max-width: 959px) {
+  html.splash-open, html.splash-open body { overflow: hidden; overscroll-behavior: none; background: var(--navy); }
+  html.splash-open body { position: fixed; inset: 0; width: 100%; }
+}
+.splash { position: fixed; inset: 0; z-index: 50; overscroll-behavior: contain; touch-action: manipulation; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #fff;
   background: radial-gradient(120% 80% at 50% 38%, #0B4AA8 0, var(--navy) 55%, #001A4D 100%); }
 .splash-orb { width: 112px; height: 112px; border-radius: 50%; background: radial-gradient(circle at 34% 30%, #B9F0FF 0, var(--cyan) 38%, #0A57C2 100%);
   box-shadow: 0 0 0 0 rgba(0,185,241,.5); animation: splash-in .9s cubic-bezier(.2,.9,.3,1.2) both, splash-ring 1.6s .5s ease-out 2; margin-bottom: 14px; }

@@ -64,6 +64,13 @@ function LangDrop({ dark }: { dark: boolean }) {
 export function Splash({ onDone }: { onDone: () => void }) {
   const { lang, setLang } = useApp();
   const L = (en: string, ta: string, hi: string) => (lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en);
+  // While the splash is up, the page behind it must not scroll, and the phone's
+  // status bar takes the splash colour.
+  useEffect(() => {
+    const root = document.documentElement, meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]'), was = meta?.content;
+    root.classList.add("splash-open"); if (meta) meta.content = "#002970";
+    return () => { root.classList.remove("splash-open"); if (meta && was) meta.content = was; };
+  }, []);
   return (
     <div className="splash">
       <LangDrop dark={true} />
