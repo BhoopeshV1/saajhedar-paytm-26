@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApp } from "../store";
 import { api, inr, qty } from "../api";
+import { CallScreen } from "./CallScreen";
 
 const Phone = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" /></svg>;
 
@@ -10,16 +11,19 @@ export function PhoneOrders() {
   const { state, lang, act, toast, go, setFocus } = useApp();
   const [open, setOpen] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [queue, setQueue] = useState<number[]>([]);
   if (!state) return null;
   const L = (en: string, ta: string, hi: string) => (lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en);
   const ring = async () => {
     setBusy(true);
     const r = await act(() => api.callSuppliers());
     setBusy(false);
-    if (r) toast({ title: r.called.length ? `${L("Called", "அழைத்தது", "फ़ोन किया")}: ${r.called.map((c) => c.supplier).join(", ")}` : L("No call was made", "அழைப்பு இல்லை", "कोई कॉल नहीं हुई"),
+    if (r?.called.length) setQueue(r.called.map((c) => c.call_id));
+    if (r && !r.called.length) toast({ title: r.called.length ? `${L("Called", "அழைத்தது", "फ़ोन किया")}: ${r.called.map((c) => c.supplier).join(", ")}` : L("No call was made", "அழைப்பு இல்லை", "कोई कॉल नहीं हुई"),
       body: r.needs_pin.length ? `${L("Needs your PIN", "உங்கள் PIN தேவை", "आपका PIN चाहिए")}: ${r.needs_pin.map((n) => `${n.supplier} ${inr(n.total)}`).join(", ")}` : undefined, tone: "good" });
   };
-  const toPay = (billId: number) => { go("pay"); setFocus({ bill_id: billId }); };
+  const toPay = (billId: number) => { setQueue([]); go("pay"); setFocus({ bill_id: billId }); };
+  const playing = queue.length ? state.calls.find((c) => c.id === queue[0]) : undefined;
   return (
     <section className="card">
       <h2 className="card-title">{L("Order by phone", "போனில் ஆர்டர்", "फ़ोन से ऑर्डर")}</h2>
@@ -43,12 +47,14 @@ export function PhoneOrders() {
                   {c.lines.filter((l) => l.agreed && l.qty < l.asked).map((l) => <p key={l.name} className="fine">{l.name}: asked for {qty(l.asked)}, supplier had {qty(l.qty)} {l.unit}.</p>)}
                 </div>
               )}
+              {c.transcript.length > 0 && <button className="link" onClick={() => setQueue([c.id])}>{L("Replay the call", "அழைப்பை மீண்டும் காட்டு", "कॉल फिर चलाएँ")}</button>}
               {c.bill_id && <button className="link" onClick={() => toPay(c.bill_id!)}>{L("See the invoice in Pay", "பில்லை செலுத்து பகுதியில் பார்", "बिल भुगतान में देखें")}</button>}
             </li>
           ))}
         </ul>
       )}
       <p className="fine">{L("Prototype: the supplier's side of the call is simulated, and no phone rings.", "முன்மாதிரி: சப்ளையர் பக்கம் மாதிரியாக உருவாக்கப்பட்டது; எந்த போனும் ஒலிக்காது.", "प्रोटोटाइप: सप्लायर की तरफ़ की बातचीत नकली है, कोई फ़ोन नहीं बजता।")}</p>
+      {playing && <CallScreen call={playing} more={queue.length - 1} onNext={() => setQueue((q) => q.slice(1))} onClose={() => setQueue([])} onInvoice={toPay} />}
     </section>
   );
 }

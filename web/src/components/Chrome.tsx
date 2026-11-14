@@ -71,6 +71,7 @@ export function BottomNav() {
       <span className="rail-only">{tab("home" as Screen)}</span>
       {TABS.slice(0, 2).map(tab)}
       <button className={`talk talk-${voice}`} onClick={toggleVoice} aria-label={voice === "off" ? "Talk to Saajhedar" : "Stop listening"}>
+        {voice !== "off" && <span className="talk-soap" aria-hidden="true"><i className="b-rim" /></span>}
         <Orb size={68} interactive />
         <span className="talk-glyph">{voice === "off" ? <IconMic /> : null}</span>
       </button>
