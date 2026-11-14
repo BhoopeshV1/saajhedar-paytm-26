@@ -49,7 +49,7 @@ The supplier's side of the call is simulated and no phone rings. `web/src/screen
 
 ## Welcome and setup
 
-Every open starts on a splash that waits for Proceed. A first visit on a device then opens `web/src/screens/Welcome.tsx` (also under "Welcome and setup" in the menu). "I run a shop" walks through a simulated phone check, shop details, how bills are kept today and a PIN, then calls `POST /api/onboard`. "Thinking of opening one?" takes an area, a kind of shop and an investment and shows `GET /api/area/fit`: how many of that kind are already there against similar areas, whether the money covers the rough setup cost, and what else the area is short of. No SMS, identity check or Paytm account lookup happens.
+Every open starts on a splash that waits for Proceed. A first visit on a device then opens `web/src/screens/Welcome.tsx` (also under "Welcome and setup" in the menu). "I run a shop" walks through a simulated phone check, shop details, how bills are kept today and a PIN, then calls `POST /api/onboard`. "Thinking of opening one?" asks one thing per page (an area, a kind of shop from a two-pane picker, an investment), plays a short scan (`web/src/screens/AreaScan.tsx`: a line-drawn globe turns to the place, dives to its streets and drops a pin for each such shop already there) and shows `GET /api/area/fit`: how many of that kind are already there against similar areas, whether the money covers the rough setup cost, and what else the area is short of. No SMS, identity check or Paytm account lookup happens.
 
 ## Laptop view
 
@@ -63,6 +63,7 @@ For a public address the app sits behind a reverse proxy, and `server/gate.ts` a
 
 Business listings: Overture Maps Foundation places (CDLA Permissive 2.0 and other open licences per source).
 Streets, water, parks, rail, localities: OpenStreetMap contributors (ODbL), Geofabrik extract.
+Coastlines on the area-scan globe: Natural Earth 1:110m land (public domain), via world-atlas.
 Listings miss small shops without an online presence, so counts are a guide, not a census.
 
 ## Known gaps

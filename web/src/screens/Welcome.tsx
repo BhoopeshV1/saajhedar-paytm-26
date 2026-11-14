@@ -1,6 +1,7 @@
 // First run. Two doors: an owner links their shop, or someone who has not
 // opened one yet checks what a locality is missing before spending anything.
 // The phone check and merchant lookup are simulated; nothing reaches Paytm.
+import { AreaScan } from "./AreaScan";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../store";
 import { api, inr, type AreaHit, type Fit, type FitKind, type KindLite, type Lang } from "../api";
@@ -135,10 +136,12 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     } catch (e: any) { setError(e.message); }
     setBusy(false);
   };
+  const [scanning, setScanning] = useState(false);
   const check = async () => {
     if (!place) { setError(L("Pick an area first.", "முதலில் ஒரு பகுதியைத் தேர்ந்தெடுங்கள்.", "पहले इलाका चुनिए।")); return; }
-    setBusy(true); setError(null);
-    try { setFit(await api.areaFit(place.lat, place.lon, 800, kind, budget)); setStep("fit"); } catch (e: any) { setError(e.message); }
+    setBusy(true); setError(null); setFit(null); setScanning(true);
+    // The scan plays while this loads and moves on to the result itself.
+    try { setFit(await api.areaFit(place.lat, place.lon, 800, kind, budget)); } catch (e: any) { setScanning(false); setError(e.message); }
     setBusy(false);
   };
   const toMap = (ask: boolean) => {
@@ -183,8 +186,8 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
         <div className="lab">{L("Area or street", "பகுதி அல்லது தெரு", "इलाका या गली")}<Locality value={place} onPick={setPlace} L={L} /></div>
       </div>
       {error && <p className="warn-line">{error}</p>}
-      <button className="btn btn-primary" onClick={() => { if (!place) { setError(L("Pick an area first.", "முதலில் ஒரு பகுதியைத் தேர்ந்தெடுங்கள்.", "पहले इलाका चुनिए।")); return; } openKinds("fence"); }}>{L("Next", "அடுத்து", "आगे")}</button>
       <p className="fine">{L("Covers Chennai and its suburbs in this prototype.", "இந்த முன்மாதிரி சென்னை மற்றும் புறநகரை மட்டும் உள்ளடக்கியது.", "इस प्रोटोटाइप में केवल चेन्नई और उपनगर शामिल हैं।")}</p>
+      <button className="btn btn-primary" onClick={() => { if (!place) { setError(L("Pick an area first.", "முதலில் ஒரு பகுதியைத் தேர்ந்தெடுங்கள்.", "पहले इलाका चुनिए।")); return; } openKinds("fence"); }}>{L("Next", "அடுத்து", "आगे")}</button>
     </div>
   );
 
@@ -221,43 +224,47 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
       <div className="money-picks">{BUDGETS.map((b) => <button key={b} className={`money-pick ${budget === b ? "on" : ""}`} aria-pressed={budget === b} onClick={() => setBudget(b)}>{lakh(b)}</button>)}</div>
       {error && <p className="warn-line">{error}</p>}
       <button className="btn btn-primary" onClick={check} disabled={busy}>{L("Show me the area", "பகுதியைக் காட்டு", "इलाका दिखाएँ")}</button>
+      {scanning && place && <AreaScan lat={place.lat} lon={place.lon} label={place.label} kind={kind} ready={fit != null} L={L} onDone={() => { setScanning(false); setStep("fit"); }} />}
     </div>
   );
 
   if (step === "fit" && fit) {
     const c = fit.chosen;
     const word = (k: FitKind) => k.level === "thin" ? L("Room for one more", "இன்னொன்றுக்கு இடம் உண்டு", "एक और की जगह है") : k.level === "crowded" ? L("Already crowded", "ஏற்கனவே நெரிசல்", "पहले से भीड़") : L("About average", "சராசரி அளவு", "लगभग औसत");
-    const cost = (k: FitKind) => k.setup_lakh ? `₹${k.setup_lakh[0]} to ${k.setup_lakh[1]} lakh` : null;
+    const cost = (k: FitKind) => k.setup_lakh ? `₹${k.setup_lakh[0]}–${k.setup_lakh[1]} lakh` : null;
     return (
-      <div className="welcome">
+      <div className="welcome arrive">
         {top}
-        <p className="step-name">{place?.label ?? fit.locality}, {L("within", "சுற்றளவு", "दायरा")} {fit.radius_m} m</p>
+        <p className="step-name">{place?.label ?? fit.locality}, {fit.radius_m} m</p>
         {c ? (
           <div className={`verdict ${c.level}`}>
             <span className="verdict-word">{kn(c)}</span>
             <span className="verdict-line">{word(c)}</span>
-            <p>{c.here} here. Areas like this one usually have about {Math.round(c.expected)}.{c.nearest_m != null ? ` The nearest is ${c.nearest_m} m away.` : ""}</p>
-            {cost(c) && <p>{c.within_budget ? `Your ${lakh(budget)} is within the rough ${cost(c)} it takes to open one.` : `Opening one takes roughly ${cost(c)}, which is more than your ${lakh(budget)}.`}</p>}
+            <div className="vs">
+              <div><b>{c.here}</b><span>{L("here", "இங்கே", "यहाँ")}</span></div>
+              <div><b>{Math.round(c.expected)}</b><span>{L("usual", "வழக்கம்", "आम तौर पर")}</span></div>
+              {c.nearest_m != null && <div><b>{c.nearest_m} m</b><span>{L("nearest", "அருகில்", "सबसे पास")}</span></div>}
+            </div>
+            {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "short"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
           </div>
         ) : (
           <div className="verdict">
             <span className="verdict-word">{lakh(budget)}</span>
-            <span className="verdict-line">{fit.options.length ? L("Here is what this area is short of", "இந்தப் பகுதியில் குறைவாக உள்ளவை", "इस इलाके में ये कम हैं") : L("Nothing stands out as missing here", "இங்கே குறை எதுவும் தெரியவில்லை", "यहाँ कोई कमी नहीं दिखती")}</span>
+            <span className="verdict-line">{fit.options.length ? L("What this area is short of", "இந்தப் பகுதியில் குறைவாக உள்ளவை", "इस इलाके में ये कम हैं") : L("Nothing stands out as missing", "குறை எதுவும் தெரியவில்லை", "कोई कमी नहीं दिखती")}</span>
           </div>
         )}
-        <div className="facts">
-          <div className="fact"><b>{fit.total_listed}</b><span>businesses listed around this spot</span></div>
-          <div className="fact"><b>{c ? c.here : fit.options.length}</b><span>{c ? `${kn(c).toLowerCase()} shops already here` : "kinds of shop that fit your money"}</span></div>
-        </div>
-        {c && c.streets.length > 0 && <section className="card"><h2 className="card-title">Some of the streets they are on</h2>
-          {c.streets.map((s) => <div key={s.name} className="alt"><i style={{ background: c.color }} /><span className="row-title">{s.name}</span><span className="bill-amt">{s.n}</span></div>)}</section>}
-        {fit.options.length > 0 && <section className="card"><h2 className="card-title">{c ? "Also worth a look for your money" : "Worth a look for your money"}</h2>
-          {fit.options.map((o) => <div key={o.key} className="alt"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span><span className="chip chip-good">{word(o)}</span>
-            <span className="row-detail">{o.here} here, similar areas have about {Math.round(o.expected)}{cost(o) ? `. Roughly ${cost(o)} to open` : ""}</span></div>)}</section>}
-        {fit.anchors.length > 0 && <section className="card"><h2 className="card-title">What brings people here</h2>
-          <p className="lede">{fit.anchors.slice(0, 5).map((a) => `${a.n} ${ANCHOR[a.key] ?? a.key}`).join(", ")}.</p></section>}
-        {fit.crowded.length > 0 && <p className="fine">Already crowded here: {fit.crowded.map((k) => `${kn(k).toLowerCase()} (${k.here})`).join(", ")}.</p>}
-        <p className="fine">{fit.caveat} {fit.setup_cost_note}</p>
+        {c && c.streets.length > 0 && <section className="card"><h2 className="card-title">{L("Where they are", "எங்கே உள்ளன", "कहाँ हैं")}</h2>
+          <div className="tags">{c.streets.map((s) => <span key={s.name} className="tag">{s.name}<b>{s.n}</b></span>)}</div></section>}
+        {fit.options.length > 0 && <section className="card"><h2 className="card-title">{c ? L("Other gaps", "மற்ற வாய்ப்புகள்", "और मौके") : L("Gaps", "வாய்ப்புகள்", "मौके")}</h2>
+          {fit.options.slice(0, 4).map((o) => <div key={o.key} className="alt gap-row"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span>
+            <span className="gap-n">{o.here} / {Math.round(o.expected)}</span>
+            {cost(o) && <span className="row-detail">{cost(o)}</span>}</div>)}
+          <p className="fine">{L("Here / usual for areas like this.", "இங்கே / இதுபோன்ற பகுதிகளில் வழக்கம்.", "यहाँ / ऐसे इलाकों में आम।")}</p></section>}
+        {fit.anchors.length > 0 && <section className="card"><h2 className="card-title">{L("Who comes here", "யார் வருகிறார்கள்", "यहाँ कौन आता है")}</h2>
+          <div className="tags">{fit.anchors.slice(0, 5).map((a) => <span key={a.key} className="tag">{ANCHOR[a.key] ?? a.key}<b>{a.n}</b></span>)}</div></section>}
+        <details className="about"><summary>{L("About these numbers", "இந்த எண்களைப் பற்றி", "इन आँकड़ों के बारे में")}</summary>
+          <p className="fine">{fit.total_listed} businesses are listed around this spot. {fit.caveat} {fit.setup_cost_note}</p>
+          {fit.crowded.length > 0 && <p className="fine">Already crowded here: {fit.crowded.map((k) => `${kn(k).toLowerCase()} (${k.here})`).join(", ")}.</p>}</details>
         <StartKit chosen={c} budget={budget} kit={kit} setKit={setKit} L={L} />
         {health?.claude && <button className="btn btn-primary" onClick={() => toMap(true)}>{L("Ask Saajhedar what it would open", "சாஜேதாரிடம் கேளுங்கள்", "साझेदार से पूछें")}</button>}
         <button className="btn btn-outline" onClick={() => toMap(false)}>{L("See it on the map", "வரைபடத்தில் பார்", "नक्शे पर देखें")}</button>
