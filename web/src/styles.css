@@ -489,6 +489,27 @@ section > .card + .card, section > .gaps + .fine { margin-top: 10px; }
 .hits { background: #fff; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
 .hits button { width: 100%; text-align: left; padding: 11px 12px; font-size: 14.5px; color: var(--ink); }
 .hits button + button { border-top: 1px solid var(--line); }
+/* Shop picker: groups down the left, shops on the right */
+.kp-find { height: 44px; border-radius: 999px; padding: 0 16px; }
+.kp { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 10px; align-items: start; margin: 0 -6px; }
+.kp-rail { display: flex; flex-direction: column; gap: 2px; background: #EAF2FA; border-radius: 18px; padding: 4px; }
+.kp-group { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 9px 4px; border-radius: 14px; font-size: 11.5px; font-weight: 600; line-height: 1.2; text-align: center; color: #4B638C; }
+.kp-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: #fff; color: var(--navy); border: 1.5px solid transparent; }
+.kp-group.on { background: #fff; color: var(--navy); }
+.kp-group.on .kp-ico { background: #E4F5FD; border-color: var(--cyan); }
+.kp-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.kp-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 104px; padding: 12px 8px; border-radius: 16px; background: #fff; border: 1.5px solid var(--line);
+  font-size: 13px; font-weight: 600; line-height: 1.25; text-align: center; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
+.kp-card.on { border-color: var(--navy); box-shadow: 0 0 0 2px rgba(0, 41, 112, .14); }
+.kp-shop { display: grid; place-items: center; }
+.kp-unsure { grid-column: 1 / -1; min-height: 0; padding: 13px 12px; font-weight: 600; color: #4B638C; background: transparent; border-style: dashed; }
+.kp-none { grid-column: 1 / -1; padding: 12px 4px; }
+.kp-confirm { position: sticky; bottom: 14px; margin-top: 4px; box-shadow: 0 10px 24px -10px rgba(0, 41, 112, .5); }
+.kp-open { display: flex; align-items: center; justify-content: space-between; text-align: left; color: var(--ink); cursor: pointer; }
+.money-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.money-pick { display: grid; place-items: center; text-align: center; padding: 0 12px; min-height: 64px; border-radius: 16px; background: #fff; border: 1.5px solid var(--line); font-size: 18px; font-weight: 700; color: var(--navy); }
+.money-pick.on { border-color: var(--navy); background: var(--navy); color: #fff; }
+.money-pick:last-child:nth-child(odd) { grid-column: 1 / -1; }
 /* In the welcome flow the suggestions sit directly under the field, in the flow of the page */
 .hits-below { position: static; margin-top: 6px; box-shadow: 0 12px 28px -14px rgba(0, 41, 112, .35); }
 .hits-below button { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 550; }
