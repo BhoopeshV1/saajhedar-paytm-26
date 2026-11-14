@@ -16,7 +16,7 @@ import { CustomerApp } from "./Customer";
 function fitDevice() {
   const w = innerWidth - 48, h = innerHeight - 48, r = document.documentElement.style;
   r.setProperty("--fit-phone", String(Math.min(1.1, w / 428, h / 900)));
-  r.setProperty("--fit-tab", String(Math.min(1.1, w / 1228, h / 868)));
+  r.setProperty("--fit-tab", String(Math.min(1.25, w / 1058, h / 750)));
 }
 fitDevice(); addEventListener("resize", fitDevice);
 

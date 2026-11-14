@@ -35,7 +35,8 @@ export function Splash({ onDone }: { onDone: () => void }) {
   const L = (en: string, ta: string, hi: string) => (lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en);
   return (
     <div className="splash">
-      <div className="seg splash-lang">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
+      <select className="lang-drop splash-drop" aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value as typeof lang)}>{LANGS.map(([l, n]) => <option key={l} value={l}>{n}</option>)}</select>
+      <div className="seg lang-seg splash-lang">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
       <span className="soap" aria-hidden="true"><i className="b-rim" /><i className="b-core" /><i className="b-shine" /></span>
       <span className="splash-name">Saajhedar</span>
       <span className="splash-line">{L("Your shop's partner", "உங்கள் கடையின் துணை", "आपकी दुकान का साथी")}</span>
@@ -98,7 +99,8 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     <div className="welcome-top">
       {step === "start" ? <span />
         : <button className="icon-btn" onClick={() => setStep(prev[step])} aria-label="Back"><Back /></button>}
-      <div className="seg">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
+      <select className="lang-drop" aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value as typeof lang)}>{LANGS.map(([l, n]) => <option key={l} value={l}>{n}</option>)}</select>
+      <div className="seg lang-seg">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
     </div>
   );
   const KindPicks = ({ none }: { none?: boolean }) => (
