@@ -242,9 +242,10 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
             <span className="verdict-line">{word(c)}</span>
             <div className="vs">
               <div><b>{c.here}</b><span>{L("here", "இங்கே", "यहाँ")}</span></div>
-              <div><b>{Math.round(c.expected)}</b><span>{L("usual", "வழக்கம்", "आम तौर पर")}</span></div>
-              {c.nearest_m != null && <div><b>{c.nearest_m} m</b><span>{L("nearest", "அருகில்", "सबसे पास")}</span></div>}
+              <i aria-hidden="true" />
+              <div className="vs-peer"><b>{Math.round(c.expected)}</b><span>{L("in similar areas", "இதுபோன்ற பகுதிகளில்", "ऐसे इलाकों में")}</span></div>
             </div>
+            {c.nearest_m != null && <span className="verdict-near">{L(`Nearest one is ${c.nearest_m} m away`, `அருகிலுள்ளது ${c.nearest_m} மீ தொலைவில்`, `सबसे पास वाली ${c.nearest_m} मी दूर`)}</span>}
             {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "short"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
           </div>
         ) : (
@@ -255,18 +256,24 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
         )}
         {c && c.streets.length > 0 && <section className="card"><h2 className="card-title">{L("Where they are", "எங்கே உள்ளன", "कहाँ हैं")}</h2>
           <div className="tags">{c.streets.map((s) => <span key={s.name} className="tag">{s.name}<b>{s.n}</b></span>)}</div></section>}
-        {fit.options.length > 0 && <section className="card"><h2 className="card-title">{c ? L("Other gaps", "மற்ற வாய்ப்புகள்", "और मौके") : L("Gaps", "வாய்ப்புகள்", "मौके")}</h2>
-          {fit.options.slice(0, 4).map((o) => <div key={o.key} className="alt gap-row"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span>
-            <span className="gap-n">{o.here} / {Math.round(o.expected)}</span>
-            {cost(o) && <span className="row-detail">{cost(o)}</span>}</div>)}
-          <p className="fine">{L("Here / usual for areas like this.", "இங்கே / இதுபோன்ற பகுதிகளில் வழக்கம்.", "यहाँ / ऐसे इलाकों में आम।")}</p></section>}
+        {fit.options.length > 0 && <section className="card"><h2 className="card-title">{c ? L("Other options", "மற்ற வாய்ப்புகள்", "और विकल्प") : L("Options", "வாய்ப்புகள்", "विकल्प")}</h2>
+          {fit.options.slice(0, 4).map((o) => { const usual = Math.max(1, Math.round(o.expected)); return (
+            <div key={o.key} className="opt"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span>{cost(o) && <span className="opt-cost">{cost(o)}</span>}
+              <span className="meter" aria-hidden="true"><b style={{ width: `${Math.min(100, (o.here / usual) * 100)}%`, background: o.color }} /></span>
+              <span className="opt-n">{L(`${o.here} here, ${usual} in similar areas`, `இங்கே ${o.here}, இதுபோன்ற பகுதிகளில் ${usual}`, `यहाँ ${o.here}, ऐसे इलाकों में ${usual}`)}</span></div>); })}</section>}
+        {fit.peers.length > 0 && <section className="card"><h2 className="card-title">{L(`Compared with ${fit.peer_count} similar areas`, `${fit.peer_count} ஒத்த பகுதிகளுடன் ஒப்பீடு`, `${fit.peer_count} मिलते-जुलते इलाकों से तुलना`)}</h2>
+          <p className="fine">{L("Similar means about as many businesses listed nearby as here. Their usual mix shows what an area this busy tends to have.", "ஒத்த பகுதி என்றால், இங்குள்ள அளவுக்கு அருகில் வணிகங்கள் உள்ள பகுதி. அவற்றின் வழக்கமான கலவை, இவ்வளவு பரபரப்பான பகுதியில் என்ன இருக்கும் என்று காட்டுகிறது.", "मिलता-जुलता यानी आसपास लगभग उतने ही कारोबार। उनका आम मेल बताता है कि इतने व्यस्त इलाके में क्या होता है।")}</p>
+          <div className="tags">{fit.peers.map((n) => <span key={n} className="tag tag-plain">{n}</span>)}</div></section>}
         {fit.anchors.length > 0 && <section className="card"><h2 className="card-title">{L("Who comes here", "யார் வருகிறார்கள்", "यहाँ कौन आता है")}</h2>
           <div className="tags">{fit.anchors.slice(0, 5).map((a) => <span key={a.key} className="tag">{ANCHOR[a.key] ?? a.key}<b>{a.n}</b></span>)}</div></section>}
         <details className="about"><summary>{L("About these numbers", "இந்த எண்களைப் பற்றி", "इन आँकड़ों के बारे में")}</summary>
           <p className="fine">{fit.total_listed} businesses are listed around this spot. {fit.caveat} {fit.setup_cost_note}</p>
           {fit.crowded.length > 0 && <p className="fine">Already crowded here: {fit.crowded.map((k) => `${kn(k).toLowerCase()} (${k.here})`).join(", ")}.</p>}</details>
         <StartKit chosen={c} budget={budget} kit={kit} setKit={setKit} L={L} />
-        {health?.claude && <button className="btn btn-primary" onClick={() => toMap(true)}>{L("Ask Saajhedar what it would open", "சாஜேதாரிடம் கேளுங்கள்", "साझेदार से पूछें")}</button>}
+        {health?.claude && <div className="ai-ask"><button className="btn btn-ai" onClick={() => toMap(true)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6a3 3 0 0 0 1.9 1.9L21.4 11.4l-5.6 1.9a3 3 0 0 0-1.9 1.9L12 20.8l-1.9-5.6a3 3 0 0 0-1.9-1.9L2.6 11.4l5.6-1.9a3 3 0 0 0 1.9-1.9zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z" /></svg>
+          {L("Ask Saajhedar AI what to open", "சாஜேதார் AI-யிடம் கேளுங்கள்", "साझेदार AI से पूछें क्या खोलें")}</button>
+          <p className="fine">{L("It reads these numbers and answers aloud with two or three picks, each with a reason and a risk.", "இந்த எண்களைப் படித்து, இரண்டு மூன்று தேர்வுகளை காரணத்துடனும் ஆபத்துடனும் சொல்லும்.", "यह ये आँकड़े पढ़कर दो-तीन विकल्प बताता है, हर एक की वजह और जोखिम के साथ।")}</p></div>}
         <button className="btn btn-outline" onClick={() => toMap(false)}>{L("See it on the map", "வரைபடத்தில் பார்", "नक्शे पर देखें")}</button>
         <button className="link" onClick={() => { setFresh(true); setStep("phone"); }}>{L("I have decided. Set up my shop", "முடிவு செய்துவிட்டேன். என் கடையை அமை", "तय कर लिया। मेरी दुकान सेट करें")}</button>
       </div>
