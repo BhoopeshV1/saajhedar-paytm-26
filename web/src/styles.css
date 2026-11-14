@@ -302,11 +302,12 @@ section > .card + .card, section > .gaps + .fine { margin-top: 10px; }
 .anchor-name { font-weight: 650; }
 
 /* ---------- Sheets, PIN, menu ---------- */
-.sheet-scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0, 20, 60, .5); display: flex; align-items: flex-end; justify-content: center; animation: fade .18s ease-out; }
-.sheet { width: 100%; max-width: 480px; background: #fff; border-radius: 28px 28px 0 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom)); animation: rise .26s cubic-bezier(.2, .8, .2, 1); max-height: 94dvh; overflow: auto; }
+.sheet-scrim { position: fixed; inset: 0; z-index: 50; background: rgba(0, 20, 60, .5); display: flex; align-items: flex-end; justify-content: center; animation: fade .32s ease-out both; overflow: hidden; }
+.sheet { width: 100%; max-width: 480px; background: #fff; border-radius: 28px 28px 0 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom)); animation: rise .46s cubic-bezier(.22, 1, .36, 1) both; will-change: transform; max-height: 94dvh; overflow: auto; }
 .sheet-grip { width: 40px; height: 4px; border-radius: 2px; background: #D5DEE9; margin: 0 auto 16px; }
 @keyframes fade { from { opacity: 0; } }
-@keyframes rise { from { transform: translateY(40px); opacity: 0; } }
+@keyframes rise { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes pop { from { transform: translateY(18px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
 .pin-head { display: flex; gap: 12px; align-items: flex-start; }
 .pin-lock { flex: none; width: 44px; height: 44px; border-radius: 14px; background: var(--navy); color: #fff; display: grid; place-items: center; }
 .pin-title { font-size: 18px; font-weight: 720; color: var(--navy); line-height: 1.3; letter-spacing: -.01em; }
@@ -633,7 +634,7 @@ div.pill { padding-right: 8px; }
     .tab-badge { top: -6px; right: -10px; }
     .talk { order: 99; margin: auto auto 6px; align-self: center; box-shadow: none; }
     .sheet-scrim { align-items: center; }
-    .sheet { border-radius: 28px; max-width: 520px; }
+    .sheet { border-radius: 28px; max-width: 520px; animation: pop .3s cubic-bezier(.22, 1, .36, 1) both; }
     .sheet-grip { display: none; }
     .toasts { left: auto; right: 28px; transform: none; top: 96px; }
     .splash { background: radial-gradient(900px 600px at 50% 36%, #0B4AA8 0, var(--navy) 55%, #001A4D 100%); }
