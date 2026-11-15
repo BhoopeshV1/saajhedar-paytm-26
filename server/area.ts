@@ -250,6 +250,26 @@ export function fit(lat: number, lon: number, radius: number, kind: string | nul
     budget, chosen: chosen ? view(chosen) : null, options, crowded: rep.crowded.slice(0, 3).map((k) => ({ label: k.label, ta: k.ta, hi: k.hi, here: k.count, expected: k.expected })),
     anchors: rep.anchors, peers: rep.peers, peer_count: rep.peer_count, caveat: rep.caveat, setup_cost_note: "Setup costs are rough illustrative ranges for this prototype, not quotes." };
 }
+// Where a second branch of the same kind of shop has room: localities that are
+// busy enough, a sensible distance away, and have fewer of that kind than areas
+// of their size usually do. Uses the same benchmark as the area report.
+export function branchSpots(kind: string, lat: number, lon: number, limit = 5) {
+  load();
+  const ki = KINDS.findIndex((k) => k.key === kind);
+  if (ki < 0) throw new AreaError("That kind of shop is not in the list.");
+  const bench = meta!.bench.filter((p) => p.total >= 120);
+  const all = meta!.bench;
+  return bench.map((p) => {
+    const km = distM(lat, lon, p.lat, p.lon) / 1000;
+    if (km < 1.5 || km > 10) return null;
+    const peers = all.filter((q) => q !== p).map((q) => ({ q, d: Math.abs(Math.log(q.total) - Math.log(p.total)) })).sort((x, y) => x.d - y.d).slice(0, 40);
+    const expected = median(peers.map((x) => x.q.counts[ki] / x.q.total)) * p.total;
+    const here = p.counts[ki];
+    return { name: p.name, lat: p.lat, lon: p.lon, here, expected: Math.round(expected * 10) / 10, listed: p.total, km: Math.round(km * 10) / 10, score: ((expected - here) / Math.sqrt(expected + 1)) / (1 + km / 5) };      // nearer is easier to run
+  }).filter((x): x is NonNullable<typeof x> => !!x && x.expected >= 2 && x.here <= x.expected * 0.6)
+    .sort((a, b) => b.score - a.score).slice(0, limit).map(({ score, ...rest }) => rest);
+}
+
 export const openableKinds = () => KINDS.filter((k) => k.openable).map(({ key, label, ta, hi, color }) => ({ key, label, ta, hi, color }));
 
 export function areaMeta() {

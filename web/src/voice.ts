@@ -10,6 +10,7 @@ type Handlers = {
   onLevel: (level: number) => void;          // 0..1, mic while listening, output while speaking
   onUtterance: (wav: Blob, seconds: number) => void;
   onError: (message: string) => void;
+  onDebug?: (event: string, data: Record<string, unknown>) => void;   // diagnostics, sent to the server log
 };
 
 const WORKLET = `
@@ -23,6 +24,8 @@ class Tap extends AudioWorkletProcessor {
 registerProcessor('tap', Tap);`;
 
 const TARGET_RATE = 16000;
+const MIC_KEY = "saajhedar.mic";
+const BLOCK_MS = 20;       // loudness is judged over blocks this long, not single audio frames
 const START_MS = 140;      // speech must persist this long to count
 const END_MS = 950;        // silence that ends an utterance
 const PREROLL_MS = 350;    // audio kept from before speech was detected
@@ -33,11 +36,21 @@ export class VoiceEngine {
   private ctx: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private node: AudioWorkletNode | null = null;
+  private src: MediaStreamAudioSourceNode | null = null;
+  private tapReady = false;
+  private tried = new Set<string>();
+  private warned = false;
   private outAnalyser: AnalyserNode | null = null;
   private state: VoiceState = "off";
   private h: Handlers;
 
-  private noise = 0.008;
+  private noise = 0.004;
+  private top = 0;
+  private low = 0;
+  private blkSum = 0;
+  private blkN = 0;
+  private stat = { blocks: 0, loud: 0, max: 0, sum: 0 };
+  private statTimer = 0;
   private pre: Float32Array[] = [];
   private preLen = 0;
   private cur: Float32Array[] = [];
@@ -81,52 +94,102 @@ export class VoiceEngine {
       const ctx = await this.unlock();
       if (!this.stream) {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser cannot use the microphone here. Open the app over HTTPS.");
-        this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
-        const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
-        await ctx.audioWorklet.addModule(url);
-        URL.revokeObjectURL(url);
-        const src = ctx.createMediaStreamSource(this.stream);
-        this.node = new AudioWorkletNode(ctx, "tap", { numberOfInputs: 1, numberOfOutputs: 1 });
-        this.node.port.onmessage = (e) => this.onFrame(e.data as Float32Array, ctx.sampleRate);
-        src.connect(this.node);
-        // Some browsers (Safari) only run nodes that lead to the speakers, so the tap
-        // is wired to the output through a silent gain.
-        const mute = ctx.createGain(); mute.gain.value = 0;
-        this.node.connect(mute); mute.connect(ctx.destination);
+        this.tried.clear(); this.warned = false;
+        // Start with the microphone that worked last time on this computer, if there was one.
+        let saved: string | null = null; try { saved = localStorage.getItem(MIC_KEY); } catch {}
+        try { await this.open(ctx, saved || undefined); }
+        catch (err) { if (!saved) throw err; try { localStorage.removeItem(MIC_KEY); } catch {} await this.open(ctx); }
       }
       this.resetCapture();
       this.frames = 0; this.peak = 0;
       // The noise floor survived stop()/start(), so once it had ratcheted up past
       // speech the only cure was a page reload. Re-measure the room each session.
       this.noise = 0.004;
+      const track = this.stream!.getAudioTracks()[0];
+      this.h.onDebug?.("mic-open", { label: track?.label, muted: track?.muted, settings: track?.getSettings?.(), rate: ctx.sampleRate, ctx: ctx.state });
       this.set("listening");
-      this.watchMic();
+      this.watchMic(); this.report();
     } catch (err: any) {
       const denied = err?.name === "NotAllowedError" || err?.name === "SecurityError";
+      this.h.onDebug?.("mic-error", { name: err?.name, message: err?.message });
       this.h.onError(denied ? "Microphone access was blocked. Allow it in the browser settings, or type instead." : err?.message || "Could not start the microphone.");
       this.set("off");
     }
+  }
+
+  // Opens a microphone (the browser's default, or a named one) and taps its audio.
+  private async open(ctx: AudioContext, deviceId?: string) {
+    this.closeMic();
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    if (!this.tapReady) {
+      const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
+      await ctx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+      this.tapReady = true;
+    }
+    this.src = ctx.createMediaStreamSource(this.stream);
+    this.node = new AudioWorkletNode(ctx, "tap", { numberOfInputs: 1, numberOfOutputs: 1 });
+    this.node.port.onmessage = (e) => this.onFrame(e.data as Float32Array, ctx.sampleRate);
+    this.src.connect(this.node);
+    // Some browsers (Safari) only run nodes that lead to the speakers, so the tap
+    // is wired to the output through a silent gain.
+    const mute = ctx.createGain(); mute.gain.value = 0;
+    this.node.connect(mute); mute.connect(ctx.destination);
+    const id = this.stream.getAudioTracks()[0]?.getSettings?.().deviceId; if (id) this.tried.add(id);
+  }
+
+  private sayMicSilent(label?: string) {
+    this.h.onError(this.frames === 0 ? "The microphone is open but no sound is reaching the app. Reload the page, or type instead."
+      : `${label ? `"${label}"` : "The microphone"} is sending silence. Pick another microphone in the browser's site settings, check it is not muted in Windows, or type instead.`);
+  }
+
+  private closeMic() {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    if (this.node) { this.node.port.onmessage = null; this.node.disconnect(); }
+    this.src?.disconnect();
+    this.stream = null; this.node = null; this.src = null;
+  }
+
+  // Some laptops put a virtual "noise-cancelling" microphone first, and it can hand
+  // the browser pure silence. When that happens, move on to the next real microphone.
+  private async nextMic(): Promise<boolean> {
+    try {
+      const all = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications");
+      const next = all.find((d) => !this.tried.has(d.deviceId));
+      this.h.onDebug?.("mic-silent", { tried: this.tried.size, available: all.map((d) => d.label), next: next?.label ?? null });
+      if (!next || !this.ctx) return false;
+      this.tried.add(next.deviceId);
+      await this.open(this.ctx, next.deviceId);
+      this.frames = 0; this.peak = 0; this.resetCapture();
+      const track = this.stream!.getAudioTracks()[0];
+      this.h.onDebug?.("mic-open", { label: track?.label, muted: track?.muted, settings: track?.getSettings?.(), rate: this.ctx.sampleRate, ctx: this.ctx.state, switched: true });
+      this.watchMic();
+      return true;
+    } catch (err: any) { this.h.onDebug?.("mic-error", { name: err?.name, message: err?.message, during: "switch" }); return false; }
   }
 
   // Says so when the microphone is open but nothing is coming through, instead of
   // sitting on "Listening" for ever.
   private watchMic() {
     clearTimeout(this.micTimer);
-    this.micTimer = window.setTimeout(() => {
+    this.micTimer = window.setTimeout(async () => {
       if (!this.stream || this.state === "off") return;
-      const track = this.stream.getAudioTracks()[0];
-      if (this.frames === 0) this.h.onError("The microphone is open but no sound is reaching the app. Reload the page, or type instead.");
-      else if (this.peak < 0.003) this.h.onError(`The microphone${track?.label ? ` (${track.label})` : ""} is silent. Check that it is not muted and that the browser is using the right one, or type instead.`);
-    }, 6000);
+      if (this.frames > 0 && this.peak >= 0.0005) return;                // sound is arriving
+      // Levels are only measured while listening; during a reply, check again afterwards.
+      if (this.state !== "listening" && this.state !== "hearing") { this.watchMic(); return; }
+      const label = this.stream.getAudioTracks()[0]?.label;
+      if (await this.nextMic()) return;
+      // A good microphone in a quiet room can also read as silence for a moment: look once more before saying so.
+      if (!this.warned) { this.warned = true; this.micTimer = window.setTimeout(() => { if (this.stream && this.peak < 0.0005 && (this.state === "listening" || this.state === "hearing")) this.sayMicSilent(label); }, 9000); return; }
+      this.sayMicSilent(label);
+    }, 2500);
   }
 
   // Ends the conversation and releases the microphone.
   stop() {
-    clearTimeout(this.micTimer);
+    clearTimeout(this.micTimer); clearInterval(this.statTimer);
     this.stopSpeaking();
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.node?.disconnect();
-    this.stream = null; this.node = null;
+    this.closeMic();
     this.resetCapture();
     this.set("off");
     this.h.onLevel(0);
@@ -136,7 +199,7 @@ export class VoiceEngine {
   pressStart() { if (this.state === "speaking") this.stopSpeaking(); this.holdToTalk = true; this.resetCapture(); this.capturing = true; this.set("hearing"); }
   pressEnd() { if (this.holdToTalk) { this.holdToTalk = false; this.finish(); } }
 
-  private resetCapture() { this.cur = []; this.curLen = 0; this.pre = []; this.preLen = 0; this.aboveMs = 0; this.belowMs = 0; this.capturing = false; }
+  private resetCapture() { this.blkSum = 0; this.blkN = 0; this.cur = []; this.curLen = 0; this.pre = []; this.preLen = 0; this.aboveMs = 0; this.belowMs = 0; this.capturing = false; }
 
   private onFrame(frame: Float32Array, rate: number) {
     this.frames++;
@@ -150,34 +213,65 @@ export class VoiceEngine {
 
     if (this.holdToTalk) { this.cur.push(frame); this.curLen += frame.length; if ((this.curLen / rate) * 1000 > MAX_MS) this.pressEnd(); return; }
 
-    const threshold = Math.max(0.01, this.noise * 3);
-    const loud = rms > threshold;
-    if (!this.capturing) {
-      if (!loud) this.noise = this.noise * 0.96 + rms * 0.04;      // track the room
+    // Keep the audio itself frame by frame.
+    if (this.capturing) { this.cur.push(frame); this.curLen += frame.length; }
+    else {
       this.pre.push(frame); this.preLen += frame.length;
       while (this.pre.length > 1 && ((this.preLen - this.pre[0].length) / rate) * 1000 >= PREROLL_MS) this.preLen -= this.pre.shift()!.length;
-      this.aboveMs = loud ? this.aboveMs + ms : Math.max(0, this.aboveMs - ms * 0.5);
+    }
+    // Judge loudness over 20 ms blocks. A single 3 ms frame swings too much within
+    // one syllable, and a quiet laptop microphone never held above the old fixed floor.
+    this.blkSum += sum; this.blkN += frame.length;
+    if ((this.blkN / rate) * 1000 < BLOCK_MS) return;
+    const level = Math.sqrt(this.blkSum / this.blkN), span = (this.blkN / rate) * 1000;
+    this.blkSum = 0; this.blkN = 0;
+    // The room's own level: falls quickly, rises slowly, and never learns from speech.
+    // While someone is speaking, "quiet" is measured against this utterance: its loudest
+    // recent level and the lowest level seen since it began. A fan that noise suppression
+    // lets through mid-sentence would otherwise keep the utterance open for many seconds.
+    if (this.capturing) { this.top = Math.max(level, this.top * 0.995); this.low = Math.min(level, this.low * 1.01 + 0.00002); }
+    const startAt = Math.max(0.0035, this.noise * 3), endAt = Math.max(0.0028, this.noise * 2, this.low * 2.2, this.top * 0.16);
+    const loud = level > (this.capturing ? endAt : startAt);
+    if (level < this.noise) this.noise = this.noise * 0.7 + level * 0.3;
+    else if (!this.capturing && !loud) this.noise = Math.min(0.05, this.noise * 0.97 + level * 0.03);
+    this.stat.blocks++; this.stat.sum += level; if (loud) this.stat.loud++; if (level > this.stat.max) this.stat.max = level;
+
+    if (!this.capturing) {
+      this.aboveMs = loud ? this.aboveMs + span : Math.max(0, this.aboveMs - span * 0.5);
       if (this.aboveMs >= START_MS) {
-        this.capturing = true; this.belowMs = 0;
+        this.capturing = true; this.belowMs = 0; this.top = level; this.low = level;
         this.cur = this.pre; this.curLen = this.preLen; this.pre = []; this.preLen = 0;
+        try { const id = this.stream?.getAudioTracks()[0]?.getSettings?.().deviceId; if (id) localStorage.setItem(MIC_KEY, id); } catch {}
+        this.h.onDebug?.("speech-start", { level: +level.toFixed(4), noise: +this.noise.toFixed(4), startAt: +startAt.toFixed(4) });
         this.set("hearing");
       }
       return;
     }
-    this.cur.push(frame); this.curLen += frame.length;
-    this.belowMs = loud ? 0 : this.belowMs + ms;
+    this.belowMs = loud ? 0 : this.belowMs + span;
     if (this.belowMs >= END_MS || (this.curLen / rate) * 1000 >= MAX_MS) this.finish(rate);
+  }
+
+  // Every two seconds while the microphone is live: what it is actually hearing.
+  private report() {
+    clearInterval(this.statTimer);
+    this.statTimer = window.setInterval(() => {
+      if (!this.stream) { clearInterval(this.statTimer); return; }
+      const s = this.stat; this.stat = { blocks: 0, loud: 0, max: 0, sum: 0 };
+      this.h.onDebug?.("level", { state: this.state, frames: this.frames, blocks: s.blocks, loud: s.loud, max: +s.max.toFixed(4), avg: +(s.blocks ? s.sum / s.blocks : 0).toFixed(4),
+        noise: +this.noise.toFixed(4), ctx: this.ctx?.state });
+    }, 2000);
   }
 
   private finish(rate = this.ctx?.sampleRate ?? 48000) {
     const chunks = this.cur, len = this.curLen;
     const spokenMs = (len / rate) * 1000 - (this.holdToTalk ? 0 : this.belowMs);
     this.resetCapture();
-    if (spokenMs < MIN_MS) { this.set("listening"); return; }
+    if (spokenMs < MIN_MS) { this.h.onDebug?.("too-short", { spokenMs: Math.round(spokenMs) }); this.set("listening"); return; }
     const pcm = new Float32Array(len);
     let o = 0; for (const c of chunks) { pcm.set(c, o); o += c.length; }
     this.set("thinking");
     this.h.onLevel(0);
+    this.h.onDebug?.("utterance", { seconds: +(len / rate).toFixed(2), spokenMs: Math.round(spokenMs) });
     // downsample() refuses to upsample, so the header must state the rate the
     // samples are actually at, not the rate we asked for.
     const outRate = Math.min(rate, TARGET_RATE);

@@ -24,6 +24,14 @@ export const useApp = () => useContext(C);
 
 const session = "s" + Math.random().toString(36).slice(2, 10);
 
+// Voice diagnostics go to the server log, so a microphone problem on someone's
+// laptop can be read there. Levels and states only, never audio.
+const voiceSession = Math.random().toString(36).slice(2, 8);
+const voiceLog = (event: string, data: Record<string, unknown> = {}) => {
+  const body = JSON.stringify({ s: voiceSession, event, ...data, ...(event === "mic-open" ? { ua: navigator.userAgent, view: `${innerWidth}x${innerHeight}`, layout: document.documentElement.dataset.layout || "wide" } : {}) });
+  fetch("/api/voice-log", { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => {});
+};
+
 export function AppProvider({ persona, customerId, children }: { persona: "owner" | "customer"; customerId?: number; children: ReactNode }) {
   const [state, setState] = useState<State | null>(null);
   const [lang, setLangState] = useState<Lang>(() => (localStorage.getItem("saajhedar.lang") as Lang) || "en-IN");
@@ -110,12 +118,13 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
   const engine = useRef<VoiceEngine | null>(null);
   if (!engine.current) {
     engine.current = new VoiceEngine({
-      onState: setVoice,
+      onState: (st) => { setVoice(st); voiceLog("state", { state: st }); },
+      onDebug: voiceLog,
       onLevel: (l) => { levelRef.current = l; },
-      onUtterance: (wav) => { runTurn({ audio: wav }).catch((err) => { console.error("[turn]", err); setCaption({ who: "error", text: err?.message || "The turn failed to start." }); }); },
+      onUtterance: (wav) => { voiceLog("sending", { bytes: wav.size }); runTurn({ audio: wav }).catch((err) => { console.error("[turn]", err); setCaption({ who: "error", text: err?.message || "The turn failed to start." }); }); },
       // Mirrored to a toast as well: the caption is replaced the moment the
       // owner taps again or opens the keyboard, taking the error with it.
-      onError: (message) => { setCaption({ who: "error", text: message }); toast({ title: "Microphone problem", body: message }); },
+      onError: (message) => { setCaption({ who: "error", text: message }); voiceLog("error", { message }); toast({ title: "Microphone problem", body: message }); },
     });
   }
 

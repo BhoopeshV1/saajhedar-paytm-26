@@ -19,6 +19,8 @@ const GROUPS: { key: string; name: [string, string, string]; kinds: string[]; ic
   { key: "tech", name: ["Electronics and repair", "எலக்ட்ரானிக்ஸ், பழுது", "इलेक्ट्रॉनिक्स और मरम्मत"], kinds: ["mobile", "hardware", "auto"], icon: "M14 6a4 4 0 0 0-5 5l-5 5 2 2 5-5a4 4 0 0 0 5-5l-2.5 2.5-2-2z" },
   { key: "service", name: ["Services", "சேவைகள்", "सेवाएँ"], kinds: ["stationery", "tuition", "laundry", "pets"], icon: "M6 4h9l3 3v13H6zM9 10h6M9 14h6" },
 ];
+const DEMO = { phone: "7305229069", code: "482916", shop: "Sri Murugan Stores", owner: "Selvam", kind: "grocery", pin: "1234",
+  place: { label: "East Tambaram", type: "locality", lat: 12.92651, lon: 80.13145 } as AreaHit };
 const SHOP = "M4 10l1.5-5h13L20 10M4 10v10h16V10M4 10a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M10 20v-5h4v5";
 const Glyph = ({ d, size = 22 }: { d: string; size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
 const BUDGETS = [100000, 300000, 500000, 1000000, 2000000];
@@ -107,17 +109,24 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
   const setKit = (k: string[]) => { handoff.kit = k; setKitState(k); };
   useEffect(() => { handoff.setup = false; }, []);
   const [kinds, setKinds] = useState<KindLite[]>([]);
-  const [phone, setPhone] = useState(""); const [otp, setOtp] = useState("");
-  const [name, setName] = useState(""); const [owner, setOwner] = useState("");
-  const [kind, setKind] = useState<string | null>(from?.kind ?? null);
-  const [place, setPlace] = useState<AreaHit | null>(from ? { label: from.place, type: "locality", lat: from.lat, lon: from.lon } : null);
+  // Filled in to start with so a demo is a few taps; every field can still be changed.
+  const [phone, setPhone] = useState(DEMO.phone); const [otp, setOtp] = useState("");
+  const [name, setName] = useState(DEMO.shop); const [owner, setOwner] = useState(DEMO.owner);
+  const [kind, setKind] = useState<string | null>(from?.kind ?? DEMO.kind);
+  const [place, setPlace] = useState<AreaHit | null>(from ? { label: from.place, type: "locality", lat: from.lat, lon: from.lon } : DEMO.place);
   const [books, setBooks] = useState("paper");
-  const [pin, setPin] = useState("");
+  const [pin, setPin] = useState(DEMO.pin);
   const [budget, setBudget] = useState(from?.budget ?? 500000);
   const [fit, setFit] = useState<Fit | null>(null);
   const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   useEffect(() => { api.kinds().then(setKinds).catch(() => {}); }, []);
   useEffect(() => { window.scrollTo({ top: 0 }); setError(null); }, [step]);
+  // The code "arrives" and fills itself in, as it would when the phone reads the SMS. Simulated.
+  useEffect(() => {
+    if (step !== "otp" || otp) return;
+    const timers = DEMO.code.split("").map((_, i) => setTimeout(() => setOtp(DEMO.code.slice(0, i + 1)), 900 + i * 130));
+    return () => timers.forEach(clearTimeout);
+  }, [step]); // eslint-disable-line
 
   // The shop picker is one page used from two places: the on-the-fence path and shop setup.
   const [kindFor, setKindFor] = useState<"fence" | "shop">("fence");
@@ -246,7 +255,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
               <div className="vs-peer"><b>{Math.round(c.expected)}</b><span>{L("in similar areas", "இதுபோன்ற பகுதிகளில்", "ऐसे इलाकों में")}</span></div>
             </div>
             {c.nearest_m != null && <span className="verdict-near">{L(`Nearest one is ${c.nearest_m} m away`, `அருகிலுள்ளது ${c.nearest_m} மீ தொலைவில்`, `सबसे पास वाली ${c.nearest_m} मी दूर`)}</span>}
-            {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "short"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
+            {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "verdict-money-over"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
           </div>
         ) : (
           <div className="verdict">
@@ -301,7 +310,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
         <p className="lede">+91 {phone.slice(0, 5)} {phone.slice(5)}</p>
         <input className="field otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} aria-label="Six digit code" />
         <button className="btn btn-primary" disabled={otp.length !== 6} onClick={() => setStep("shop")}>{L("Continue", "தொடர்", "आगे बढ़ें")}</button>
-        <p className="fine">Prototype: any six digits work.</p>
+        <p className="fine">Prototype: no SMS is sent. The code fills itself in to show how it would be read from the message; any six digits work.</p>
       </>}
 
       {step === "shop" && <>
@@ -320,10 +329,11 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
 
       {step === "books" && <>
         <h1 className="h-step">{L("How do you write bills today?", "இப்போது பில் எப்படி எழுதுகிறீர்கள்?", "अभी बिल कैसे बनाते हैं?")}</h1>
-        {([["paper", L("On a paper pad", "காகிதத்தில்", "कागज़ की पर्ची पर"), L("Call out the items as you always do. Saajhedar writes the bill and keeps the stock count.", "எப்போதும் போல பொருட்களைச் சொல்லுங்கள். சாஜேதார் பில் எழுதி இருப்பைக் கணக்கிடும்.", "हमेशा की तरह सामान बोलिए। साझेदार बिल लिखेगा और स्टॉक गिनेगा।")],
-          ["app", L("In a billing app", "பில்லிங் ஆப்பில்", "बिलिंग ऐप में"), L("Keep it. Saajhedar reads its exports and sends every sale and payment back to it.", "அதையே வைத்திருங்கள். சாஜேதார் அதிலிருந்து படித்து, ஒவ்வொரு விற்பனையையும் திருப்பி அனுப்பும்.", "उसे रखिए। साझेदार उसकी फ़ाइलें पढ़ेगा और हर बिक्री वापस भेजेगा।")],
-          ["none", L("I don't write bills", "பில் எழுதுவதில்லை", "बिल नहीं बनाता"), L("Start now by voice. No typing.", "இப்போதே குரலால் தொடங்குங்கள். தட்டச்சு தேவையில்லை.", "अभी बोलकर शुरू करें। टाइपिंग नहीं।")]] as const).map(([k, title, text]) => (
-          <button key={k} className={`choice ${books === k ? "on" : ""}`} onClick={() => setBooks(k)}><span className="row-title">{title}</span><span className="row-detail">{text}</span></button>))}
+        {([["paper", "M5 3h10l4 4v14H5zM15 3v4h4M8 11h8M8 14.5h8M8 18h5", L("On paper", "காகிதத்தில்", "कागज़ पर"), L("Say the items. Saajhedar writes the bill.", "பொருட்களைச் சொல்லுங்கள். சாஜேதார் பில் எழுதும்.", "सामान बोलिए। साझेदार बिल लिखेगा।")],
+          ["app", "M9 2h6a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 5h2M12 18.5h.01", L("In a billing app", "பில்லிங் ஆப்பில்", "बिलिंग ऐप में"), L("Keep it. Saajhedar works with it.", "அதையே வைத்திருங்கள். சாஜேதார் அதனுடன் இயங்கும்.", "उसे रखिए। साझेदार उसके साथ चलेगा।")],
+          ["none", "M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4", L("No bills yet", "பில் இல்லை", "अभी बिल नहीं"), L("Start by voice.", "குரலால் தொடங்குங்கள்.", "बोलकर शुरू करें।")]] as const).map(([k, icon, title, text]) => (
+          <button key={k} className={`choice choice-icon ${books === k ? "on" : ""}`} aria-pressed={books === k} onClick={() => setBooks(k)}><span className="choice-glyph"><Glyph d={icon} size={24} /></span>
+            <span className="row-main"><span className="row-title">{title}</span><span className="row-detail">{text}</span></span></button>))}
         <button className="btn btn-primary" onClick={() => setStep("pin")}>{L("Continue", "தொடர்", "आगे बढ़ें")}</button>
       </>}
 

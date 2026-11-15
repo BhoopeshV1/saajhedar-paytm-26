@@ -67,6 +67,7 @@ export type AreaReport = { lat: number; lon: number; radius_m: number; locality:
   anchors: { key: string; n: number; names: string[] }[]; peers: string[]; confidence: "good" | "fair" | "low"; caveat: string; sources: string[] };
 export type AreaMap = { box: { w: number; e: number; s: number; n: number }; roads: [number, string, number[]][]; water: number[][]; park: number[][]; rail: number[][]; coast: number[][];
   places: [number, number, number, number, string, string][]; kinds: { key: string; label: string; color: string }[]; anchors: string[] };
+export type BranchSpot = { name: string; lat: number; lon: number; here: number; expected: number; listed: number; km: number };
 export type AreaHit = { label: string; ta?: string; type: "locality" | "street"; lat: number; lon: number };
 
 export type TurnEvent =
@@ -103,6 +104,7 @@ export const api = {
   reset: () => post("/api/reset"),
   counterSale: (body: { lines: { item: string; qty: number; price?: number }[]; pay?: string; customer?: string }) => post<{ bill_no: string; order_id: number; total: number; lines: OrderLine[] }>("/api/bills/counter", body),
   kinds: () => req<KindLite[]>("/api/area/kinds"),
+  areaBranch: (kind: string, lat: number, lon: number) => req<BranchSpot[]>(`/api/area/branch?kind=${kind}&lat=${lat}&lon=${lon}`),
   areaFit: (lat: number, lon: number, r: number, kind: string | null, budget: number | null) => req<Fit>(`/api/area/fit?lat=${lat}&lon=${lon}&r=${r}${kind ? `&kind=${kind}` : ""}${budget ? `&budget=${budget}` : ""}`),
   onboard: (body: Record<string, unknown>) => post<{ ok: boolean }>("/api/onboard", body),
   callSuppliers: () => post<{ called: { call_id: number; supplier: string; total: number; summary: string }[]; needs_pin: { supplier: string; total: number; why: string }[] }>("/api/calls", {}),

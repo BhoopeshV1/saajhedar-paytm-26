@@ -11,6 +11,7 @@ Saajhedar is Hindi for business partner. It is not a Paytm product. This is a ha
 - **Pay.** Supplier invoices land here, from a phone order, a photo of a paper bill, or a billing-app export. Each is checked against what was delivered before it is paid.
 - **Collect.** Udhaar (credit) per customer, with reminders written in the shop's language.
 - **Rules.** The owner says a rule, such as "Pay the milk supplier up to 3,000 rupees without asking", and signs it with a PIN. Plain code enforces the rules; the model can only propose. Each job screen opens with the rules that govern it.
+- **Grow.** "Grow my shop" on Home asks the area data three questions for a shop that already exists: where a second branch of the same kind has room (`GET /api/area/branch`), what is sold thinly around the shop that it could stock, and what other shop the neighbourhood is short of. The shop's own sales are not used yet.
 - **Area view.** For someone who has not opened a shop yet: pick a place, a kind of shop and an investment, and see who is already there and what the area is short of, then a starter kit and setup.
 
 Voice is Sarvam (speech to text and text to speech, in English, Tamil and Hindi). Reasoning is Claude with a tool loop.
