@@ -320,10 +320,11 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
 
       {step === "books" && <>
         <h1 className="h-step">{L("How do you write bills today?", "இப்போது பில் எப்படி எழுதுகிறீர்கள்?", "अभी बिल कैसे बनाते हैं?")}</h1>
-        {([["paper", L("On a paper pad", "காகிதத்தில்", "कागज़ की पर्ची पर"), L("Call out the items as you always do. Saajhedar writes the bill and keeps the stock count.", "எப்போதும் போல பொருட்களைச் சொல்லுங்கள். சாஜேதார் பில் எழுதி இருப்பைக் கணக்கிடும்.", "हमेशा की तरह सामान बोलिए। साझेदार बिल लिखेगा और स्टॉक गिनेगा।")],
-          ["app", L("In a billing app", "பில்லிங் ஆப்பில்", "बिलिंग ऐप में"), L("Keep it. Saajhedar reads its exports and sends every sale and payment back to it.", "அதையே வைத்திருங்கள். சாஜேதார் அதிலிருந்து படித்து, ஒவ்வொரு விற்பனையையும் திருப்பி அனுப்பும்.", "उसे रखिए। साझेदार उसकी फ़ाइलें पढ़ेगा और हर बिक्री वापस भेजेगा।")],
-          ["none", L("I don't write bills", "பில் எழுதுவதில்லை", "बिल नहीं बनाता"), L("Start now by voice. No typing.", "இப்போதே குரலால் தொடங்குங்கள். தட்டச்சு தேவையில்லை.", "अभी बोलकर शुरू करें। टाइपिंग नहीं।")]] as const).map(([k, title, text]) => (
-          <button key={k} className={`choice ${books === k ? "on" : ""}`} onClick={() => setBooks(k)}><span className="row-title">{title}</span><span className="row-detail">{text}</span></button>))}
+        {([["paper", "M5 3h10l4 4v14H5zM15 3v4h4M8 11h8M8 14.5h8M8 18h5", L("On paper", "காகிதத்தில்", "कागज़ पर"), L("Say the items. Saajhedar writes the bill.", "பொருட்களைச் சொல்லுங்கள். சாஜேதார் பில் எழுதும்.", "सामान बोलिए। साझेदार बिल लिखेगा।")],
+          ["app", "M9 2h6a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 5h2M12 18.5h.01", L("In a billing app", "பில்லிங் ஆப்பில்", "बिलिंग ऐप में"), L("Keep it. Saajhedar works with it.", "அதையே வைத்திருங்கள். சாஜேதார் அதனுடன் இயங்கும்.", "उसे रखिए। साझेदार उसके साथ चलेगा।")],
+          ["none", "M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v4", L("No bills yet", "பில் இல்லை", "अभी बिल नहीं"), L("Start by voice.", "குரலால் தொடங்குங்கள்.", "बोलकर शुरू करें।")]] as const).map(([k, icon, title, text]) => (
+          <button key={k} className={`choice choice-icon ${books === k ? "on" : ""}`} aria-pressed={books === k} onClick={() => setBooks(k)}><span className="choice-glyph"><Glyph d={icon} size={24} /></span>
+            <span className="row-main"><span className="row-title">{title}</span><span className="row-detail">{text}</span></span></button>))}
         <button className="btn btn-primary" onClick={() => setStep("pin")}>{L("Continue", "தொடர்", "आगे बढ़ें")}</button>
       </>}
 

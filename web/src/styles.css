@@ -490,6 +490,9 @@ section > .card + .card, section > .gaps + .fine { margin-top: 10px; }
 .pick { padding: 9px 13px; border-radius: 999px; background: #fff; border: 1.5px solid var(--line); font-size: 14px; font-weight: 600; color: var(--ink); min-height: 40px; }
 .pick.on { border-color: var(--navy); background: var(--navy); color: #fff; }
 .choice { width: 100%; text-align: left; background: #fff; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 2px; }
+.choice-icon { flex-direction: row; align-items: center; gap: 12px; }
+.choice-glyph { flex: none; width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: #EAF4FC; color: var(--navy); }
+.choice-icon.on .choice-glyph { background: var(--navy); color: #fff; }
 .choice.on { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(0,185,241,.25); }
 .hits { background: #fff; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; }
 .hits button { width: 100%; text-align: left; padding: 11px 12px; font-size: 14.5px; color: var(--ink); }
