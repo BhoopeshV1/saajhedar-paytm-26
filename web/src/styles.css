@@ -487,12 +487,12 @@ section > .card + .card, section > .gaps + .fine { margin-top: 10px; }
 .door-title { font-size: 18px; font-weight: 740; color: var(--navy); letter-spacing: -.01em; }
 .door-ico { grid-row: 1 / span 2; grid-column: 1; width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: #E4F5FD; color: var(--navy); }
 .door .door-ico svg { grid-area: auto; color: inherit; }
-.door-fence .door-ico { background: rgba(255,255,255,.14); color: #fff; }
+.door-fence .door-ico { background: rgba(255,255,255,.2); color: #fff; }
 .door-grow .door-ico { background: #DDF6E6; color: #0B6B3A; }
 .door-title { grid-column: 2; }
 .door-text { grid-column: 2; font-size: 14px; line-height: 1.45; }
 .door > svg { grid-row: 1 / span 2; grid-column: 3; color: var(--navy); }
-.door-fence { background: linear-gradient(135deg, var(--navy) 0, #04358A 100%); color: #C9DAF5; }
+.door-fence { background: linear-gradient(135deg, #2460B5 0, #3A7ED0 100%); color: #E6F0FD; }
 .door-fence .door-title, .door-fence > svg { color: #fff; }
 .steps { display: flex; gap: 6px; }
 .steps span { flex: 1; height: 5px; border-radius: 3px; background: #D6E2EE; }
