@@ -39,12 +39,33 @@ const fail = (err: unknown) => {
 };
 
 // Words the speech recogniser should expect: item, customer and supplier names.
-function keyterms(): string[] {
+function keyterms(lang?: Lang | "unknown"): string[] {
+  // Sarvam accepts at most 50 terms. Insertion order used to decide which
+  // survived, so every Tamil and Hindi item name fell off the end. Keep the
+  // spoken language's names, then English, then people and suppliers.
   const out = new Set<string>(["Saajhedar", "udhaar", "Paytm", "Soundbox", "Karthigai Deepam"]);
-  for (const r of all("SELECT name_en, name_ta, name_hi FROM items")) { out.add(r.name_en); out.add(r.name_ta); out.add(r.name_hi); }
+  const items = all("SELECT name_en, name_ta, name_hi FROM items") as { name_en: string; name_ta: string; name_hi: string }[];
+  const spoken = lang === "ta-IN" ? "name_ta" : lang === "hi-IN" ? "name_hi" : "name_en";
+  for (const r of items) if (r[spoken as keyof typeof r]) out.add(r[spoken as keyof typeof r]);
+  if (spoken !== "name_en") for (const r of items) out.add(r.name_en);
   for (const r of all("SELECT name FROM customers")) out.add(r.name);
   for (const r of all("SELECT name FROM suppliers")) out.add(r.name);
   return [...out];
+}
+
+// Turns an upstream failure into something the shopkeeper can act on. A bare
+// "the assistant hit a problem" hides the one fact that matters: whose key or
+// quota is at fault, and whether waiting will help.
+function explain(raw: string): string {
+  const has = (...bits: string[]) => bits.some((b) => raw.toLowerCase().includes(b));
+  if (has("invalid x-api-key", "authentication_error", "401")) return "The Anthropic API key is not valid. Check ANTHROPIC_API_KEY in .env, then restart the server.";
+  if (has("permission_error", "403")) return "The Anthropic API key is not allowed to use this model. Check the key's workspace and permissions.";
+  if (has("rate_limit", "429")) return "Too many requests to the assistant just now. Wait a moment and try again.";
+  if (has("credit balance", "billing", "quota")) return "The Anthropic account has no credit left. Top it up, then try again.";
+  if (has("not_found_error", "model:")) return "That Claude model is not available to this key. Check CLAUDE_MODEL in .env.";
+  if (has("overloaded", "529")) return "Claude is overloaded right now. Try again in a few seconds.";
+  if (has("fetch failed", "econnrefused", "enotfound", "network", "timeout")) return "Could not reach the assistant. Check this machine's internet connection.";
+  return "The assistant hit a problem. Please try again.";
 }
 
 // One voice or text turn, streamed back as newline-delimited JSON so the phone
@@ -60,11 +81,11 @@ function turnStream(input: { audio?: Blob; filename?: string; text?: string; eve
         let text = input.text?.trim() ?? "";
         let lang: Lang = input.hint && input.hint !== "unknown" ? input.hint : "en-IN";
         if (input.audio) {
-          const heard = await transcribe(input.audio, input.filename || "speech.webm", { hint: input.hint ?? "unknown", keyterms: keyterms() });
+          const heard = await transcribe(input.audio, input.filename || "speech.webm", { hint: input.hint ?? "unknown", keyterms: keyterms(input.hint) });
           console.log("[voice] heard", JSON.stringify({ bytes: input.audio.size, chars: (heard as any)?.text?.length ?? 0, lang: (heard as any)?.lang }));
           text = heard.text; lang = heard.lang;
           send({ type: "heard", text, lang, ms: heard.ms });
-          if (!text) { send({ type: "empty" }); send({ type: "done" }); ctrl.close(); return; }
+          if (!text) { send({ type: "empty", message: "I did not catch that. Say it again, a little closer to the microphone." }); send({ type: "done" }); ctrl.close(); return; }
         } else if (text) {
           lang = langOfText(text, lang);
           send({ type: "heard", text, lang, ms: 0 });
@@ -79,6 +100,9 @@ function turnStream(input: { audio?: Blob; filename?: string; text?: string; eve
         if (input.wantAudio && sarvamReady()) {
           const parts = sentences(reply);
           const jobs = parts.map((p) => speak(p, replyLang));
+          // Every sentence is synthesised at once but awaited in order, so a late
+          // rejection would be unhandled once the loop below breaks. Sink them.
+          jobs.forEach((j) => j.catch(() => {}));
           for (let i = 0; i < jobs.length; i++) {
             try { const a = await jobs[i]; send({ type: "audio", seq: i, last: i === jobs.length - 1, b64: a.b64, mime: a.mime, ms: a.ms }); }
             catch (err) { send({ type: "audio_error", message: (err as Error).message }); break; }
@@ -87,8 +111,12 @@ function turnStream(input: { audio?: Blob; filename?: string; text?: string; eve
         send({ type: "done", ms: Math.round(performance.now() - t0) });
       } catch (err) {
         const known = err instanceof ops.OpError || err instanceof SpeechError || err instanceof area.AreaError;
+        const raw = String((err as Error)?.message ?? err);
         if (!known) console.error("[turn]", err);
-        send({ type: "error", message: known ? (err as Error).message : "The assistant hit a problem. Please try again." , detail: known ? undefined : String((err as Error).message).slice(0, 300) });
+        send({ type: "error", message: known ? (err as Error).message : explain(raw), detail: known ? undefined : raw.slice(0, 300) });
+        // Every other exit sends `done`; without it a client waiting on `done`
+        // stays stuck showing "thinking" after a failure.
+        send({ type: "done", ms: Math.round(performance.now() - t0) });
       }
       try { ctrl.close(); } catch {}
     },

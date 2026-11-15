@@ -264,7 +264,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
           </div>
         )}
         {c && c.streets.length > 0 && <section className="card"><h2 className="card-title">{L("Where they are", "எங்கே உள்ளன", "कहाँ हैं")}</h2>
-          <div className="tags">{c.streets.map((s) => <span key={s.name} className="tag">{s.name}<b>{s.n}</b></span>)}</div></section>}
+          <div className="tags">{c.streets.map((s) => <span key={s.name} className="tag">{s.name}</span>)}</div></section>}
         {fit.options.length > 0 && <section className="card"><h2 className="card-title">{c ? L("Other options", "மற்ற வாய்ப்புகள்", "और विकल्प") : L("Options", "வாய்ப்புகள்", "विकल्प")}</h2>
           {fit.options.slice(0, 4).map((o) => { const usual = Math.max(1, Math.round(o.expected)); return (
             <div key={o.key} className="opt"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span>{cost(o) && <span className="opt-cost">{cost(o)}</span>}

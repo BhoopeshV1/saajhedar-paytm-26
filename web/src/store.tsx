@@ -76,27 +76,44 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
         if (ac.signal.aborted) return;
         switch (e.type) {
           case "heard": if (e.text) setCaption({ who: "you", text: e.text }); break;
-          case "empty": setCaption(null); break;
+          case "empty": setCaption({ who: "error", text: e.message || "I did not catch that. Say it again." }); break;
           case "tool":
-            if (e.screen) setScreen(e.screen);
-            if (e.focus) setFocus(e.focus);
+            if (e.screen) { setScreen(e.screen); setFocus(e.focus ?? null); document.querySelector(".shell > main")?.scrollTo({ top: 0 }); }
+            else if (e.focus) setFocus(e.focus);
             refresh();
             break;
           case "say": setCaption({ who: "thunai", text: e.text }); break;
           case "audio": gotAudio = true; eng.enqueue(e.b64, e.last); break;
-          case "error": setCaption({ who: "error", text: e.message }); break;
+          case "error":
+            setCaption({ who: "error", text: e.message });
+            if (e.detail) console.error("[turn]", e.detail);
+            toast({ title: e.message, body: e.detail });
+            break;
+          case "audio_error":
+            gotAudio = false;
+            console.warn("[turn] spoken reply failed:", e.message);
+            toast({ title: "Could not play the spoken reply", body: e.message });
+            break;
+          case "done": break;
+          default: console.warn("[turn] unhandled event type", (e as TurnEvent).type);
         }
       }, ac.signal);
     } catch (err: any) {
-      if (err?.name !== "AbortError") setCaption({ who: "error", text: "Could not reach the server. Check the connection and try again." });
+      if (err?.name !== "AbortError") {
+        console.error("[turn]", err);
+        setCaption({ who: "error", text: `Could not reach the server. ${err?.message ?? ""}`.trim() });
+      }
     }
-    inTurn.current = false;
     if (!ac.signal.aborted) {
+      // Clearing this outside the guard let an aborted turn's teardown wipe the
+      // flag belonging to the turn that replaced it, so the PIN sheet stopped
+      // opening for anything said after the first utterance.
+      inTurn.current = false;
       if (!gotAudio) eng.endReply();
       setBusy(false);
       refresh();
     }
-  }, [persona, refresh]);
+  }, [persona, refresh, toast]);
 
   const engine = useRef<VoiceEngine | null>(null);
   if (!engine.current) {
@@ -104,8 +121,10 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
       onState: (st) => { setVoice(st); voiceLog("state", { state: st }); },
       onDebug: voiceLog,
       onLevel: (l) => { levelRef.current = l; },
-      onUtterance: (wav) => { voiceLog("sending", { bytes: wav.size }); runTurn({ audio: wav }); },
-      onError: (message) => setCaption({ who: "error", text: message }),
+      onUtterance: (wav) => { voiceLog("sending", { bytes: wav.size }); runTurn({ audio: wav }).catch((err) => { console.error("[turn]", err); setCaption({ who: "error", text: err?.message || "The turn failed to start." }); }); },
+      // Mirrored to a toast as well: the caption is replaced the moment the
+      // owner taps again or opens the keyboard, taking the error with it.
+      onError: (message) => { setCaption({ who: "error", text: message }); voiceLog("error", { message }); toast({ title: "Microphone problem", body: message }); },
     });
   }
 
@@ -133,7 +152,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
   // Live updates from the server.
   useEffect(() => {
     refresh();
-    api.health().then(setHealth).catch(() => {});
+    api.health().then((h) => { setHealth(h); if (!h.sarvam) toast({ title: "Voice is off", body: "SARVAM_API_KEY is not set, so speech will not work. Type instead." }); if (!h.claude) toast({ title: "The assistant cannot answer", body: "ANTHROPIC_API_KEY is not set." }); }).catch(() => toast({ title: "Could not reach the server" }));
     let es: EventSource | null = null; let timer: any; let closed = false;
     const connect = () => {
       es = new EventSource("/api/events");

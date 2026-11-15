@@ -9,3 +9,8 @@ server.log
 data/voice
 .site-auth.json
 data/call-webhook.log
+
+# Agent skills installed locally, not part of the project
+.agents/
+.claude/
+skills-lock.json
