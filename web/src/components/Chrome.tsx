@@ -213,8 +213,8 @@ export function Menu({ open, onClose }: { open: boolean; onClose: () => void }) 
         <button className="menu-row" onClick={() => { go("rules"); onClose(); }}>{t("rules", lang)}</button>
         <button className="menu-row" onClick={() => { go("area"); onClose(); }}>{t("area", lang)}</button>
         <a className="menu-row" href="#/order" target="_blank" rel="noreferrer">{t("customerView", lang)}</a>
-        <button className="menu-row" onClick={() => window.dispatchEvent(new Event("thunai:welcome"))}>{lang === "ta-IN" ? "தொடக்கத் திரை" : lang === "hi-IN" ? "शुरुआती स्क्रीन" : "Welcome and setup"}</button>
-        <button className="menu-row menu-danger" onClick={() => act(() => api.reset()).then(onClose)}>{t("resetDemo", lang)}</button>
+        <button className="menu-row" onClick={() => { window.dispatchEvent(new Event("thunai:splash")); window.dispatchEvent(new Event("thunai:welcome")); }}>{lang === "ta-IN" ? "தொடக்கத் திரை" : lang === "hi-IN" ? "शुरुआती स्क्रीन" : "Welcome and setup"}</button>
+        <button className="menu-row menu-danger" onClick={() => act(() => api.reset()).then(() => { onClose(); window.dispatchEvent(new Event("thunai:splash")); })}>{t("resetDemo", lang)}</button>
         <p className="menu-foot">
           {t("prototype", lang)}. Voice by Sarvam AI {health?.sarvam ? "" : "(key missing)"}, reasoning by Claude {health?.claude ? "" : "(key missing)"}. Payments, loans and messages are simulated.
         </p>

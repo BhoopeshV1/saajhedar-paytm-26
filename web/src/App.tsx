@@ -58,6 +58,16 @@ function Shell() {
   const [welcome, setWelcome] = useState(() => !seen());
   const [splash, setSplash] = useState(true);
   useEffect(() => { const on = () => { setMenu(false); setWelcome(true); }; window.addEventListener("thunai:welcome", on); return () => window.removeEventListener("thunai:welcome", on); }, []);
+  // Every arrival starts at the splash: a fresh load, a page the browser brought
+  // back from memory, a tab reopened after ten minutes away, and a demo reset.
+  useEffect(() => {
+    let hiddenAt = 0;
+    const show = () => { setMenu(false); setSplash(true); };
+    const back = (e: PageTransitionEvent) => { if (e.persisted) show(); };
+    const vis = () => { if (document.hidden) hiddenAt = Date.now(); else if (hiddenAt && Date.now() - hiddenAt > 10 * 60_000) show(); };
+    window.addEventListener("thunai:splash", show); window.addEventListener("pageshow", back); document.addEventListener("visibilitychange", vis);
+    return () => { window.removeEventListener("thunai:splash", show); window.removeEventListener("pageshow", back); document.removeEventListener("visibilitychange", vis); };
+  }, []);
   if (welcome) return <><div className="shell welcome-shell"><Welcome onDone={(how) => { try { localStorage.setItem("thunai_setup", how); } catch {} setWelcome(false); }} /><Toasts />{splash && <Splash onDone={() => setSplash(false)} />}</div><LayoutToggle /><TeamBadge /></>;
   return (
     <>
