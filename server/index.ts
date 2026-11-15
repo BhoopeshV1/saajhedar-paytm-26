@@ -60,6 +60,7 @@ function turnStream(input: { audio?: Blob; filename?: string; text?: string; eve
         let lang: Lang = input.hint && input.hint !== "unknown" ? input.hint : "en-IN";
         if (input.audio) {
           const heard = await transcribe(input.audio, input.filename || "speech.webm", { hint: input.hint ?? "unknown", keyterms: keyterms() });
+          console.log("[voice] heard", JSON.stringify({ bytes: input.audio.size, chars: (heard as any)?.text?.length ?? 0, lang: (heard as any)?.lang }));
           text = heard.text; lang = heard.lang;
           send({ type: "heard", text, lang, ms: heard.ms });
           if (!text) { send({ type: "empty" }); send({ type: "done" }); ctrl.close(); return; }
@@ -141,6 +142,11 @@ Bun.serve({
         return turnStream({ audio, filename: (audio as File).name || "speech.webm", sessionId: String(form.get("session") || "default"),
           persona: form.get("persona") === "customer" ? "customer" : "owner", customerId: form.get("customer_id") ? Number(form.get("customer_id")) : undefined,
           hint: (LANGS as string[]).includes(hint) ? (hint as Lang) : "unknown", wantAudio: form.get("audio_out") !== "0" });
+      }
+      if (p === "/api/voice-log" && m === "POST") {
+        const line = JSON.stringify(await req.json()).slice(0, 900);
+        console.log("[voice]", line);
+        return json({ ok: true });
       }
       if (p === "/api/text" && m === "POST") {
         const b = await req.json() as any;

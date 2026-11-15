@@ -10,6 +10,7 @@ type Handlers = {
   onLevel: (level: number) => void;          // 0..1, mic while listening, output while speaking
   onUtterance: (wav: Blob, seconds: number) => void;
   onError: (message: string) => void;
+  onDebug?: (event: string, data: Record<string, unknown>) => void;   // diagnostics, sent to the server log
 };
 
 const WORKLET = `
@@ -23,6 +24,7 @@ class Tap extends AudioWorkletProcessor {
 registerProcessor('tap', Tap);`;
 
 const TARGET_RATE = 16000;
+const BLOCK_MS = 20;       // loudness is judged over blocks this long, not single audio frames
 const START_MS = 140;      // speech must persist this long to count
 const END_MS = 950;        // silence that ends an utterance
 const PREROLL_MS = 350;    // audio kept from before speech was detected
@@ -37,7 +39,11 @@ export class VoiceEngine {
   private state: VoiceState = "off";
   private h: Handlers;
 
-  private noise = 0.008;
+  private noise = 0.004;
+  private blkSum = 0;
+  private blkN = 0;
+  private stat = { blocks: 0, loud: 0, max: 0, sum: 0 };
+  private statTimer = 0;
   private pre: Float32Array[] = [];
   private preLen = 0;
   private cur: Float32Array[] = [];
@@ -96,10 +102,13 @@ export class VoiceEngine {
       }
       this.resetCapture();
       this.frames = 0; this.peak = 0;
+      const track = this.stream.getAudioTracks()[0];
+      this.h.onDebug?.("mic-open", { label: track?.label, muted: track?.muted, settings: track?.getSettings?.(), rate: ctx.sampleRate, ctx: ctx.state });
       this.set("listening");
-      this.watchMic();
+      this.watchMic(); this.report();
     } catch (err: any) {
       const denied = err?.name === "NotAllowedError" || err?.name === "SecurityError";
+      this.h.onDebug?.("mic-error", { name: err?.name, message: err?.message });
       this.h.onError(denied ? "Microphone access was blocked. Allow it in the browser settings, or type instead." : err?.message || "Could not start the microphone.");
       this.set("off");
     }
@@ -119,7 +128,7 @@ export class VoiceEngine {
 
   // Ends the conversation and releases the microphone.
   stop() {
-    clearTimeout(this.micTimer);
+    clearTimeout(this.micTimer); clearInterval(this.statTimer);
     this.stopSpeaking();
     this.stream?.getTracks().forEach((t) => t.stop());
     this.node?.disconnect();
@@ -133,7 +142,7 @@ export class VoiceEngine {
   pressStart() { if (this.state === "speaking") this.stopSpeaking(); this.holdToTalk = true; this.resetCapture(); this.capturing = true; this.set("hearing"); }
   pressEnd() { if (this.holdToTalk) { this.holdToTalk = false; this.finish(); } }
 
-  private resetCapture() { this.cur = []; this.curLen = 0; this.pre = []; this.preLen = 0; this.aboveMs = 0; this.belowMs = 0; this.capturing = false; }
+  private resetCapture() { this.blkSum = 0; this.blkN = 0; this.cur = []; this.curLen = 0; this.pre = []; this.preLen = 0; this.aboveMs = 0; this.belowMs = 0; this.capturing = false; }
 
   private onFrame(frame: Float32Array, rate: number) {
     this.frames++;
@@ -147,34 +156,60 @@ export class VoiceEngine {
 
     if (this.holdToTalk) { this.cur.push(frame); this.curLen += frame.length; if ((this.curLen / rate) * 1000 > MAX_MS) this.pressEnd(); return; }
 
-    const threshold = Math.max(0.01, this.noise * 3);
-    const loud = rms > threshold;
-    if (!this.capturing) {
-      if (!loud) this.noise = this.noise * 0.96 + rms * 0.04;      // track the room
+    // Keep the audio itself frame by frame.
+    if (this.capturing) { this.cur.push(frame); this.curLen += frame.length; }
+    else {
       this.pre.push(frame); this.preLen += frame.length;
       while (this.pre.length > 1 && ((this.preLen - this.pre[0].length) / rate) * 1000 >= PREROLL_MS) this.preLen -= this.pre.shift()!.length;
-      this.aboveMs = loud ? this.aboveMs + ms : Math.max(0, this.aboveMs - ms * 0.5);
+    }
+    // Judge loudness over 20 ms blocks. A single 3 ms frame swings too much within
+    // one syllable, and a quiet laptop microphone never held above the old fixed floor.
+    this.blkSum += sum; this.blkN += frame.length;
+    if ((this.blkN / rate) * 1000 < BLOCK_MS) return;
+    const level = Math.sqrt(this.blkSum / this.blkN), span = (this.blkN / rate) * 1000;
+    this.blkSum = 0; this.blkN = 0;
+    // The room's own level: falls quickly, rises slowly, and never learns from speech.
+    const startAt = Math.max(0.0035, this.noise * 3), endAt = Math.max(0.0028, this.noise * 2);
+    const loud = level > (this.capturing ? endAt : startAt);
+    if (level < this.noise) this.noise = this.noise * 0.7 + level * 0.3;
+    else if (!this.capturing && !loud) this.noise = Math.min(0.05, this.noise * 0.97 + level * 0.03);
+    this.stat.blocks++; this.stat.sum += level; if (loud) this.stat.loud++; if (level > this.stat.max) this.stat.max = level;
+
+    if (!this.capturing) {
+      this.aboveMs = loud ? this.aboveMs + span : Math.max(0, this.aboveMs - span * 0.5);
       if (this.aboveMs >= START_MS) {
         this.capturing = true; this.belowMs = 0;
         this.cur = this.pre; this.curLen = this.preLen; this.pre = []; this.preLen = 0;
+        this.h.onDebug?.("speech-start", { level: +level.toFixed(4), noise: +this.noise.toFixed(4), startAt: +startAt.toFixed(4) });
         this.set("hearing");
       }
       return;
     }
-    this.cur.push(frame); this.curLen += frame.length;
-    this.belowMs = loud ? 0 : this.belowMs + ms;
+    this.belowMs = loud ? 0 : this.belowMs + span;
     if (this.belowMs >= END_MS || (this.curLen / rate) * 1000 >= MAX_MS) this.finish(rate);
+  }
+
+  // Every two seconds while the microphone is live: what it is actually hearing.
+  private report() {
+    clearInterval(this.statTimer);
+    this.statTimer = window.setInterval(() => {
+      if (!this.stream) { clearInterval(this.statTimer); return; }
+      const s = this.stat; this.stat = { blocks: 0, loud: 0, max: 0, sum: 0 };
+      this.h.onDebug?.("level", { state: this.state, frames: this.frames, blocks: s.blocks, loud: s.loud, max: +s.max.toFixed(4), avg: +(s.blocks ? s.sum / s.blocks : 0).toFixed(4),
+        noise: +this.noise.toFixed(4), ctx: this.ctx?.state });
+    }, 2000);
   }
 
   private finish(rate = this.ctx?.sampleRate ?? 48000) {
     const chunks = this.cur, len = this.curLen;
     const spokenMs = (len / rate) * 1000 - (this.holdToTalk ? 0 : this.belowMs);
     this.resetCapture();
-    if (spokenMs < MIN_MS) { this.set("listening"); return; }
+    if (spokenMs < MIN_MS) { this.h.onDebug?.("too-short", { spokenMs: Math.round(spokenMs) }); this.set("listening"); return; }
     const pcm = new Float32Array(len);
     let o = 0; for (const c of chunks) { pcm.set(c, o); o += c.length; }
     this.set("thinking");
     this.h.onLevel(0);
+    this.h.onDebug?.("utterance", { seconds: +(len / rate).toFixed(2), spokenMs: Math.round(spokenMs) });
     this.h.onUtterance(encodeWav(downsample(pcm, rate, TARGET_RATE), TARGET_RATE), len / rate);
   }
 
