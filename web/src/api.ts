@@ -107,7 +107,7 @@ export const api = {
   areaBranch: (kind: string, lat: number, lon: number) => req<BranchSpot[]>(`/api/area/branch?kind=${kind}&lat=${lat}&lon=${lon}`),
   areaFit: (lat: number, lon: number, r: number, kind: string | null, budget: number | null) => req<Fit>(`/api/area/fit?lat=${lat}&lon=${lon}&r=${r}${kind ? `&kind=${kind}` : ""}${budget ? `&budget=${budget}` : ""}`),
   onboard: (body: Record<string, unknown>) => post<{ ok: boolean }>("/api/onboard", body),
-  callSuppliers: () => post<{ called: { call_id: number; supplier: string; total: number; summary: string }[]; needs_pin: { supplier: string; total: number; why: string }[] }>("/api/calls", {}),
+  callSuppliers: () => post<{ called: { call_id: number; supplier: string; total: number; summary: string }[]; needs_pin: { supplier: string; total: number; why: string }[]; real?: { supplier: string }; real_error?: string }>("/api/calls", {}),
   cancelBill: (id: number) => post(`/api/bills/counter/${id}/cancel`),
   syncConnect: (body: { url?: string; demo?: boolean }) => post<{ name: string }>("/api/billing/sync/connect", body),
   syncDisconnect: () => post("/api/billing/sync/disconnect"),

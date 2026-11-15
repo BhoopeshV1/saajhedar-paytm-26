@@ -1,4 +1,6 @@
 .env
+*.swp
+*.swo
 node_modules
 web/dist
 data/raw/*.json
@@ -8,6 +10,7 @@ data/raw/*.geojsonseq
 server.log
 data/voice
 .site-auth.json
+data/call-webhook.log
 
 # Agent skills installed locally, not part of the project
 .agents/

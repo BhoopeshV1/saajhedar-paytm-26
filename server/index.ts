@@ -3,6 +3,7 @@
 import { gate } from "./gate";
 import { callVoice } from "./callvoice";
 import path from "node:path";
+import { placeCall, outboundMissing, outboundReady } from "./outbound";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { migrate } from "./db";
@@ -158,7 +159,7 @@ Bun.serve({
     const url = new URL(req.url); const p = url.pathname; const m = req.method;
     if (!p.startsWith("/api/")) return serveStatic(p);
     try {
-      if (p === "/api/health") return json({ ok: true, sarvam: sarvamReady(), claude: claudeReady(), model: MODEL, stt: STT_MODEL, tts: TTS_MODEL, speaker: TTS_SPEAKER, area: area.areaMeta() });
+      if (p === "/api/health") return json({ ok: true, sarvam: sarvamReady(), claude: claudeReady(), model: MODEL, stt: STT_MODEL, tts: TTS_MODEL, speaker: TTS_SPEAKER, area: area.areaMeta(), real_calls_missing: outboundMissing(), real_calls: outboundReady() && !!process.env.CALL_TEST_NUMBER });
       if (p === "/api/state") return json(ops.snapshot());
       if (p === "/api/events") return sse(req);
 
@@ -203,12 +204,32 @@ Bun.serve({
       if ((mm = p.match(/^\/api\/rules\/(\d+)\/remove$/)) && m === "POST") return json(ops.proposeRuleRemoval(Number(mm[1])));
       if (p === "/api/reset" && m === "POST") { seed(true); resetSessions(); sync.demoReset(); ops.autopilot(); return json({ ok: true }); }
 
-      if (p === "/api/calls" && m === "POST") return json(ops.callSuppliers(await req.json().catch(() => ({})) as any));
+      if (p === "/api/calls" && m === "POST") {
+        // When real calls are set up, the first supplier inside the rule is also rung for real, on the test number.
+        const live = outboundReady() && !!process.env.CALL_TEST_NUMBER;
+        const { real_brief, ...out } = ops.callSuppliers({ ...(await req.json().catch(() => ({})) as any), real: live });
+        if (!live || !real_brief) return json(out);
+        try { await placeCall(process.env.CALL_TEST_NUMBER!, real_brief); console.log("[call] real call placed for", real_brief.supplier); return json({ ...out, real: { supplier: real_brief.supplier } }); }
+        catch (err) { console.log("[call] real call failed:", (err as Error).message); return json({ ...out, real_error: (err as Error).message }); }
+      }
       if (p === "/api/calls/voice") {
         const bytes = await callVoice(url.searchParams.get("who") || "", url.searchParams.get("text") || "");
         return bytes ? new Response(bytes as unknown as BodyInit, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=86400" } }) : json({ error: "No voice for this line." }, 404);
       }
-      if (p === "/api/calls/webhook" && m === "POST") return json(ops.callWebhook(await req.json()));
+      // Rings a real phone through Sarvam's voice agent, briefed with today's order. Only works once set up in .env.
+      if (p === "/api/calls/real" && m === "POST") {
+        const b = await req.json().catch(() => ({})) as any;
+        const to = String(b.to || process.env.CALL_TEST_NUMBER || "");
+        if (!to) return json({ error: "No number to call. Send {to} or set CALL_TEST_NUMBER." }, 400);
+        try { return json(await placeCall(to, ops.realCallBrief(), b.language)); } catch (err) { return json({ error: (err as Error).message }, 400); }
+      }
+      if (p === "/api/calls/webhook" && m === "POST") {
+        // Keep each report exactly as it arrived, so the real payload shape can be read.
+        const raw = await req.text();
+        try { fs.appendFileSync(path.join(import.meta.dir, "..", "data", "call-webhook.log"), `${new Date().toISOString()} ${raw.slice(0, 20000)}\n`); } catch {}
+        let body: any = {}; try { body = JSON.parse(raw); } catch {}
+        return json(ops.callWebhook(body));
+      }
       if (p === "/api/onboard" && m === "POST") { const r = ops.onboard(await req.json() as any); refreshWeather(); return json(r); }
       if (p === "/api/area/kinds") return json(area.openableKinds());
       if (p === "/api/area/branch") return json(area.branchSpots(url.searchParams.get("kind") || "grocery", num(url.searchParams.get("lat")), num(url.searchParams.get("lon"))));

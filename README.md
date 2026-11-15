@@ -42,6 +42,8 @@ Phones need HTTPS for the microphone, for example `tailscale serve 8787`.
 
 The supplier's side of the call is simulated and no phone rings. `web/src/screens/CallScreen.tsx` plays the call back as a phone screen. With `OPENAI_API_KEY` set, `server/callvoice.ts` voices each line (one voice for the agent, another for the supplier) and keeps the audio in `data/voice/` so replays cost nothing. `POST /api/calls/webhook` accepts a post-call report from a real voice agent, but its payload shape has not been checked against a live campaign.
 
+`POST /api/calls/real` rings a real phone through a Sarvam voice agent (`server/outbound.ts`, Instant Outbound API), briefed with the first supplier's order and told to send its report to the webhook. It is off until the `SARVAM_AGENT_*` settings in `.env.example` are filled in. With those and `CALL_TEST_NUMBER` set, "Call suppliers and order" also rings that test number for the first supplier inside the rule, with at most three items, and the on-screen call is not played. The order and invoice recorded in the app still come from the simulated answer, not from what was said on the real call.
+
 ## Bill book and billing apps
 
 - **Counter bills.** The owner calls out the items and the assistant's `make_bill` tool writes the bill, takes the items out of stock and records the money. `POST /api/bills/counter` does the same without voice.

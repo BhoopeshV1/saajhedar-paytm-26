@@ -15,7 +15,7 @@ type Ctx = {
   levelRef: React.MutableRefObject<number>;
   pin: Pending | null; openPin: (p: Pending) => void; closePin: () => void;
   toasts: Toast[]; toast: (t: Omit<Toast, "id">) => void;
-  health: { sarvam: boolean; claude: boolean; area: { ready: boolean } } | null;
+  health: { sarvam: boolean; claude: boolean; real_calls?: boolean; area: { ready: boolean } } | null;
   refresh: () => void;
   act: <T>(fn: () => Promise<T>) => Promise<T | undefined>;
 };

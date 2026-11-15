@@ -554,7 +554,7 @@ export function importDocs(docs: BillDoc[], source: string) {
 const PRICE_TOLERANCE = 0.05;
 type OrderLine = { sku: string; name: string; qty: number; unit: string; cost: number; supplier_id: number; supplier: string };
 
-export function callSuppliers(input: { scope?: "urgent" | "all_suggested" } = {}) {
+export function callSuppliers(input: { scope?: "urgent" | "all_suggested"; real?: boolean } = {}) {
   const plan = restockPlan();
   let pick = input.scope === "all_suggested" ? plan.lines.filter((l) => l.order_qty > 0 && l.urgency !== "ok") : urgentLines(plan);
   if (!pick.length) throw new OpError("Nothing needs ordering right now.");
@@ -568,14 +568,36 @@ export function callSuppliers(input: { scope?: "urgent" | "all_suggested" } = {}
   const bySupplier = new Map<number, OrderLine[]>();
   for (const l of pick) bySupplier.set(l.supplier_id, [...(bySupplier.get(l.supplier_id) ?? []), { sku: l.sku, name: l.name_en, qty: l.order_qty, unit: l.unit, cost: l.cost, supplier_id: l.supplier_id, supplier: l.supplier }]);
   const called: any[] = [], needs_pin: any[] = [];
-  for (const [sid, ls] of bySupplier) {
+  // With real calls switched on, the first supplier inside the rule gets a real
+  // phone call, kept to three items so the call stays short.
+  let real_brief: { supplier: string; shop: string; owner: string; items: string; total: string } | null = null;
+  for (const [sid, all_ls] of bySupplier) {
+    let ls = all_ls;
     const total = Math.round(ls.reduce((s, l) => s + l.qty * l.cost, 0));
     const v = judgeOrder(sid, ls[0].supplier, total);
+    if (v.decision === "allow" && input.real && !real_brief) {
+      ls = ls.slice(0, 3);
+      const s = shop();
+      real_brief = { supplier: ls[0].supplier, shop: String(s.name), owner: String(s.owner ?? ""), total: String(Math.round(ls.reduce((a, l) => a + l.qty * l.cost, 0))),
+        items: ls.map((l) => `${l.qty} ${l.unit} ${l.name} at ${l.cost} rupees per ${l.unit}`).join("; ") };
+    }
     if (v.decision === "allow") called.push(phoneCall(sid, ls, `Rule #${v.rule.id}`));
     else needs_pin.push({ supplier: ls[0].supplier, total, why: v.why, pending_id: addPending("phone_order", { supplier_id: sid, lines: ls }, `Call ${ls[0].supplier} and order ${inr(total)}`, v.why) });
   }
   emit({ type: "refresh" });
-  return { called, needs_pin, note: "The supplier's side of each call is simulated in this prototype. Invoices from the calls are in Pay; pay after the delivery is counted." };
+  return { called, needs_pin, real_brief, note: "The supplier's side of each call is simulated in this prototype. Invoices from the calls are in Pay; pay after the delivery is counted." };
+}
+
+// What a real call would be told to order: the first supplier in today's plan,
+// with the owner's ordering limit. Used to brief the voice agent.
+export function realCallBrief() {
+  const plan = restockPlan(), pick = urgentLines(plan);
+  if (!pick.length) throw new OpError("Nothing needs ordering right now.");
+  const sid = pick[0].supplier_id, ls = pick.filter((l) => l.supplier_id === sid);
+  const total = Math.round(ls.reduce((s, l) => s + l.order_qty * l.cost, 0));
+  const shop = get("SELECT name, owner FROM shop LIMIT 1") ?? {};
+  return { supplier: String(ls[0].supplier), shop: String(shop.name ?? "the shop"), owner: String(shop.owner ?? ""), total,
+    items: ls.map((l) => `${l.order_qty} ${l.unit} ${l.name_en} at ${inr(l.cost)}`).join("; ") };
 }
 
 export function phoneCall(supplierId: number, lines: OrderLine[], via: string) {
