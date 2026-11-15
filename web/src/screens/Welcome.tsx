@@ -19,6 +19,8 @@ const GROUPS: { key: string; name: [string, string, string]; kinds: string[]; ic
   { key: "tech", name: ["Electronics and repair", "எலக்ட்ரானிக்ஸ், பழுது", "इलेक्ट्रॉनिक्स और मरम्मत"], kinds: ["mobile", "hardware", "auto"], icon: "M14 6a4 4 0 0 0-5 5l-5 5 2 2 5-5a4 4 0 0 0 5-5l-2.5 2.5-2-2z" },
   { key: "service", name: ["Services", "சேவைகள்", "सेवाएँ"], kinds: ["stationery", "tuition", "laundry", "pets"], icon: "M6 4h9l3 3v13H6zM9 10h6M9 14h6" },
 ];
+const DEMO = { phone: "7305229069", code: "482916", shop: "Sri Murugan Stores", owner: "Selvam", kind: "grocery", pin: "1234",
+  place: { label: "East Tambaram", type: "locality", lat: 12.92651, lon: 80.13145 } as AreaHit };
 const SHOP = "M4 10l1.5-5h13L20 10M4 10v10h16V10M4 10a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M10 20v-5h4v5";
 const Glyph = ({ d, size = 22 }: { d: string; size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
 const BUDGETS = [100000, 300000, 500000, 1000000, 2000000];
@@ -107,17 +109,24 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
   const setKit = (k: string[]) => { handoff.kit = k; setKitState(k); };
   useEffect(() => { handoff.setup = false; }, []);
   const [kinds, setKinds] = useState<KindLite[]>([]);
-  const [phone, setPhone] = useState(""); const [otp, setOtp] = useState("");
-  const [name, setName] = useState(""); const [owner, setOwner] = useState("");
-  const [kind, setKind] = useState<string | null>(from?.kind ?? null);
-  const [place, setPlace] = useState<AreaHit | null>(from ? { label: from.place, type: "locality", lat: from.lat, lon: from.lon } : null);
+  // Filled in to start with so a demo is a few taps; every field can still be changed.
+  const [phone, setPhone] = useState(DEMO.phone); const [otp, setOtp] = useState("");
+  const [name, setName] = useState(DEMO.shop); const [owner, setOwner] = useState(DEMO.owner);
+  const [kind, setKind] = useState<string | null>(from?.kind ?? DEMO.kind);
+  const [place, setPlace] = useState<AreaHit | null>(from ? { label: from.place, type: "locality", lat: from.lat, lon: from.lon } : DEMO.place);
   const [books, setBooks] = useState("paper");
-  const [pin, setPin] = useState("");
+  const [pin, setPin] = useState(DEMO.pin);
   const [budget, setBudget] = useState(from?.budget ?? 500000);
   const [fit, setFit] = useState<Fit | null>(null);
   const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   useEffect(() => { api.kinds().then(setKinds).catch(() => {}); }, []);
   useEffect(() => { window.scrollTo({ top: 0 }); setError(null); }, [step]);
+  // The code "arrives" and fills itself in, as it would when the phone reads the SMS. Simulated.
+  useEffect(() => {
+    if (step !== "otp" || otp) return;
+    const timers = DEMO.code.split("").map((_, i) => setTimeout(() => setOtp(DEMO.code.slice(0, i + 1)), 900 + i * 130));
+    return () => timers.forEach(clearTimeout);
+  }, [step]); // eslint-disable-line
 
   // The shop picker is one page used from two places: the on-the-fence path and shop setup.
   const [kindFor, setKindFor] = useState<"fence" | "shop">("fence");
@@ -301,7 +310,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
         <p className="lede">+91 {phone.slice(0, 5)} {phone.slice(5)}</p>
         <input className="field otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} aria-label="Six digit code" />
         <button className="btn btn-primary" disabled={otp.length !== 6} onClick={() => setStep("shop")}>{L("Continue", "தொடர்", "आगे बढ़ें")}</button>
-        <p className="fine">Prototype: any six digits work.</p>
+        <p className="fine">Prototype: no SMS is sent. The code fills itself in to show how it would be read from the message; any six digits work.</p>
       </>}
 
       {step === "shop" && <>

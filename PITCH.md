@@ -14,7 +14,7 @@ The story has three acts, and the first is the hero: **start** a shop knowing th
 
 **0:00 Hook.** Splash on screen. Say the line above, then tap Proceed.
 
-**0:08 Three questions.** Tap "Thinking of opening one?". Type Tambaram and pick East Tambaram, Next. Pick Grocery and provisions, Confirm. Pick 5 lakh. "Where, what, and how much. Nothing else."
+**0:08 Three questions.** Tap "Thinking of opening one?". East Tambaram, Grocery and 5 lakh are already filled in, so it is three taps: Next, Confirm, then "Show me the area". "Where, what, and how much. Nothing else."
 
 **0:22 The scan.** Tap "Show me the area" and let it play. Talk over it: "This is real data. It finds his street, and every pin that drops is a grocery that is already open there." Do not skip it; it is eight seconds and it is the picture people remember.
 
