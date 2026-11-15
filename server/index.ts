@@ -3,6 +3,7 @@
 import { gate } from "./gate";
 import { callVoice } from "./callvoice";
 import path from "node:path";
+import { placeCall, outboundMissing } from "./outbound";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { migrate } from "./db";
@@ -130,7 +131,7 @@ Bun.serve({
     const url = new URL(req.url); const p = url.pathname; const m = req.method;
     if (!p.startsWith("/api/")) return serveStatic(p);
     try {
-      if (p === "/api/health") return json({ ok: true, sarvam: sarvamReady(), claude: claudeReady(), model: MODEL, stt: STT_MODEL, tts: TTS_MODEL, speaker: TTS_SPEAKER, area: area.areaMeta() });
+      if (p === "/api/health") return json({ ok: true, sarvam: sarvamReady(), claude: claudeReady(), model: MODEL, stt: STT_MODEL, tts: TTS_MODEL, speaker: TTS_SPEAKER, area: area.areaMeta(), real_calls_missing: outboundMissing() });
       if (p === "/api/state") return json(ops.snapshot());
       if (p === "/api/events") return sse(req);
 
@@ -179,6 +180,13 @@ Bun.serve({
       if (p === "/api/calls/voice") {
         const bytes = await callVoice(url.searchParams.get("who") || "", url.searchParams.get("text") || "");
         return bytes ? new Response(bytes as unknown as BodyInit, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=86400" } }) : json({ error: "No voice for this line." }, 404);
+      }
+      // Rings a real phone through Sarvam's voice agent, briefed with today's order. Only works once set up in .env.
+      if (p === "/api/calls/real" && m === "POST") {
+        const b = await req.json().catch(() => ({})) as any;
+        const to = String(b.to || process.env.CALL_TEST_NUMBER || "");
+        if (!to) return json({ error: "No number to call. Send {to} or set CALL_TEST_NUMBER." }, 400);
+        try { return json(await placeCall(to, ops.realCallBrief(), b.language)); } catch (err) { return json({ error: (err as Error).message }, 400); }
       }
       if (p === "/api/calls/webhook" && m === "POST") {
         // Keep each report exactly as it arrived, so the real payload shape can be read.

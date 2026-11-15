@@ -578,6 +578,18 @@ export function callSuppliers(input: { scope?: "urgent" | "all_suggested" } = {}
   return { called, needs_pin, note: "The supplier's side of each call is simulated in this prototype. Invoices from the calls are in Pay; pay after the delivery is counted." };
 }
 
+// What a real call would be told to order: the first supplier in today's plan,
+// with the owner's ordering limit. Used to brief the voice agent.
+export function realCallBrief() {
+  const plan = restockPlan(), pick = urgentLines(plan);
+  if (!pick.length) throw new OpError("Nothing needs ordering right now.");
+  const sid = pick[0].supplier_id, ls = pick.filter((l) => l.supplier_id === sid);
+  const total = Math.round(ls.reduce((s, l) => s + l.order_qty * l.cost, 0));
+  const shop = get("SELECT name, owner FROM shop LIMIT 1") ?? {};
+  return { supplier: String(ls[0].supplier), shop: String(shop.name ?? "the shop"), owner: String(shop.owner ?? ""), total,
+    items: ls.map((l) => `${l.order_qty} ${l.unit} ${l.name_en} at ${inr(l.cost)}`).join("; ") };
+}
+
 export function phoneCall(supplierId: number, lines: OrderLine[], via: string) {
   const sup = get("SELECT * FROM suppliers WHERE id = ?", supplierId);
   if (!sup) throw new OpError("Unknown supplier.");
