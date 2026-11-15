@@ -561,6 +561,23 @@ section > .card + .card, section > .gaps + .fine { margin-top: 10px; }
 .mic-bars i { display: block; width: 5px; height: 5px; border-radius: 3px; background: linear-gradient(180deg, #F2FBFF, #8FDFFF); box-shadow: 0 0 6px rgba(143, 223, 255, .7); }
 .mic-bars i:nth-child(odd) { background: linear-gradient(180deg, #D6F3FF, #5CCBF7); }
 
+/* Needs you: separate cards; beyond two they tuck behind as a stack */
+.needs { display: flex; flex-direction: column; gap: 10px; }
+.needs-title { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
+.needs-count { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--navy); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.need-list { display: flex; flex-direction: column; gap: 8px; position: relative; }
+.need-list > li { position: relative; z-index: 2; animation: pop .3s cubic-bezier(.2, .8, .2, 1) both; }
+.need { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 12px; min-height: 64px; border-radius: 18px; background: #fff; box-shadow: var(--shadow); color: var(--muted); text-align: left; }
+.need .row-title, .need .row-detail { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.need .row-main { min-width: 0; }
+/* the edges of the cards waiting underneath */
+.need-list.stacked { padding-bottom: 14px; margin-bottom: 2px; }
+.need-list.stacked::before, .need-list.stacked::after { content: ""; position: absolute; height: 30px; border-radius: 0 0 18px 18px; background: #fff; box-shadow: var(--shadow); }
+.need-list.stacked::before { left: 12px; right: 12px; bottom: 6px; z-index: 1; background: #F4F9FD; border: 1px solid #D5E3F1; border-top: 0; }
+.need-list.stacked::after { left: 26px; right: 26px; bottom: -2px; z-index: 0; background: #E9F2FA; border: 1px solid #D5E3F1; border-top: 0; }
+.need-more { align-self: center; padding: 6px 14px; border-radius: 999px; background: #E4EEF8; color: var(--navy); font-size: 12.5px; font-weight: 650; }
+@media (prefers-reduced-motion: reduce) { .need-list > li { animation: none; } }
+
 /* Grow my shop: the Home entry and its sheet */
 .grow-card { display: flex; align-items: center; gap: 12px; padding: 16px 14px; border-radius: var(--r-card); text-align: left; color: #fff;
   background: linear-gradient(110deg, #002970 0%, #0B57C9 60%, #00BAF2 100%); box-shadow: 0 12px 26px -14px rgba(0, 41, 112, .7); }
