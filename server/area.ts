@@ -91,6 +91,15 @@ export function nearestLocality(lat: number, lon: number) {
 // ---------- report ----------
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : 0; };
 
+// A locality's mix of businesses as shares, leaving out the catch-all "other".
+const OTHER = KINDS.findIndex((k) => k.key === "other");
+const mix = (c: number[]) => { const t = c.reduce((s, n, i) => s + (i === OTHER ? 0 : n), 0) || 1; return c.map((n, i) => (i === OTHER ? 0 : n / t)); };
+const cosine = (a: number[], b: number[]) => { let d = 0, x = 0, y = 0; for (let i = 0; i < a.length; i++) { d += a[i] * b[i]; x += a[i] * a[i]; y += b[i] * b[i]; } return d / Math.sqrt(x * y || 1); };
+// The kinds one mix has much more of than another: what makes it a different sort of place.
+const leansTo = (a: number[], b: number[], n: number) => a.map((v, i) => ({ i, d: v - b[i] })).filter((x) => x.d > 0.02).sort((x, y) => y.d - x.d).slice(0, n).map((x) => KINDS[x.i].label);
+const median2 = (rows: number[][]) => (rows[0] ?? []).map((_, i) => median(rows.map((r) => r[i])));
+const topKinds = (c: number[], n: number) => c.map((v, i) => ({ i, v })).filter((x) => x.i !== OTHER && x.v > 0).sort((a, b) => b.v - a.v).slice(0, n).map((x) => KINDS[x.i].label);
+
 export function report(lat: number, lon: number, radius = 800) {
   load();
   const b = meta!.bbox;
@@ -117,12 +126,24 @@ export function report(lat: number, lon: number, radius = 800) {
   // cancels out much of the uneven coverage in open data.
   const scale = (r * r) / (meta!.bench_radius * meta!.bench_radius);
   const sizeHere = Math.max(1, total / scale);
-  const peers = meta!.bench.filter((p) => distM(lat, lon, p.lat, p.lon) > 600)
+  const picked = meta!.bench.filter((p) => distM(lat, lon, p.lat, p.lon) > 600)
     .map((p) => ({ p, d: Math.abs(Math.log(p.total) - Math.log(sizeHere)) })).sort((x, y) => x.d - y.d).slice(0, 40).map((x) => x.p);
+  // Second look at the peers: size alone lets in areas of a different character
+  // (an office district beside a residential one). Compare each peer's mix of
+  // businesses with this area's, and drop the ones that are clearly unlike it.
+  const hereMix = mix(counts);
+  const scored = picked.map((p) => ({ p, sim: cosine(hereMix, mix(p.counts)) }));
+  const cut = median(scored.map((x) => x.sim)) - 0.1;
+  let keptS = scored.filter((x) => x.sim >= cut);
+  if (keptS.length < 20) keptS = [...scored].sort((a, b) => b.sim - a.sim).slice(0, Math.min(20, scored.length));
+  const peers = keptS.map((x) => x.p);
+  const dropped = scored.filter((x) => !keptS.includes(x)).sort((a, b) => a.sim - b.sim)
+    .map((x) => ({ name: x.p.name, similarity: Math.round(x.sim * 100), mostly: leansTo(mix(x.p.counts), hereMix, 3) }));
 
   const kinds = KINDS.map((k, ki) => {
     const shares = peers.map((p) => p.counts[ki] / p.total);
     const expected = median(shares) * total;
+    const before = median(picked.map((p) => p.counts[ki] / p.total)) * total;
     const peerHave = peers.filter((p) => p.counts[ki] > 0).length / Math.max(1, peers.length);
     const actual = counts[ki];
     let nearest: number | null = null;
@@ -130,7 +151,7 @@ export function report(lat: number, lon: number, radius = 800) {
       for (const i of within(lat, lon, 4000)) if (P!.kind[i] === ki) { const d = distM(lat, lon, P!.lat[i], P!.lon[i]); if (nearest == null || d < nearest) nearest = d; }
     }
     const gap = (expected - actual) / Math.sqrt(expected + 1);
-    return { key: k.key, label: k.label, ta: k.ta, hi: k.hi, color: k.color, openable: k.openable, count: actual, expected: Math.round(expected * 10) / 10,
+    return { key: k.key, label: k.label, ta: k.ta, hi: k.hi, color: k.color, openable: k.openable, count: actual, expected: Math.round(expected * 10) / 10, expected_by_size: Math.round(before * 10) / 10,
       peer_have: Math.round(peerHave * 100), nearest_m: nearest == null ? null : Math.round(nearest), gap: Math.round(gap * 100) / 100,
       level: (expected >= 1.5 && actual <= expected * 0.5 ? "thin" : actual >= expected * 1.6 && actual >= 4 ? "crowded" : "typical") as "thin" | "crowded" | "typical" };
   });
@@ -151,6 +172,7 @@ export function report(lat: number, lon: number, radius = 800) {
     off_street: total - [...byStreet.values()].reduce((s, e) => s + e.n, 0),
     anchors: Object.entries(anchors).map(([key, v]) => ({ key, n: v.n, names: v.names })).filter((a) => a.n > 0),
     peers: peers.slice(0, 5).map((p) => p.name), peer_count: peers.length,
+    peer_review: { picked: picked.length, kept: peers.length, dropped, here_mostly: dropped.length ? leansTo(hereMix, median2(scored.filter((x) => !keptS.includes(x)).map((x) => mix(x.p.counts))), 3) : topKinds(counts, 3) },
     confidence: total >= 150 ? "good" : total >= 50 ? "fair" : "low",
     caveat: "Counts are businesses listed in open map data (Overture Maps, OpenStreetMap). Small shops without an online listing are missing, so treat these as a guide, not a census.",
     sources: meta!.sources,
@@ -206,6 +228,26 @@ export function resolvePlace(place: string, near?: { lat: number; lon: number })
   return hits;
 }
 
+// One kind of shop at one spot, with the checks that tried to explain the number
+// away. The assistant calls this again with a different place, radius, kind or
+// budget to explore "what if" before it recommends anything.
+export function checkForAgent(place: string, kind: string, radius?: number, budget?: number, at?: { lat: number; lon: number }) {
+  const h = at ? { label: place, lat: at.lat, lon: at.lon } : resolvePlace(place)[0];
+  const f = fit(h.lat, h.lon, radius ?? 800, kind, budget ?? null);
+  if (!f.chosen || !f.checks) throw new AreaError(`"${kind}" is not a kind of shop this tool knows. Use a kind_key from area_gaps could_open.`);
+  const c = f.checks;
+  return { place: h.label, lat: h.lat, lon: h.lon, radius_m: f.radius_m, kind: f.chosen.label, here: f.chosen.here, similar_areas_have_about: f.chosen.expected, standing: f.chosen.level,
+    rough_setup_lakh: f.chosen.setup_lakh, within_budget: f.chosen.within_budget,
+    how_firmly_to_say_it: c.strength === "direction" ? "direction only: lead with the fact that evidence is thin, and do not state the gap as a number" : c.strength === "fair" ? "fairly: mention the one check that did not pass" : c.strength === "firm" ? "firmly: all four checks passed" : "nothing unusual here",
+    peers: { picked_by_size: f.peer_review.picked, kept_after_dropping_unlike_areas: f.peer_review.kept, dropped: f.peer_review.dropped.slice(0, 4).map((d) => `${d.name} (leans to ${d.mostly.join(", ")})`),
+      usual_number_before_and_after: [c.moved.from, c.moved.to] },
+    checks: { enough_data: { businesses_listed: c.coverage.listed, passed: c.coverage.ok }, just_outside_the_circle: { more_within_400_m: c.outside.count, usual: c.outside.usual, passed: c.outside.ok },
+      substitutes: { kinds: c.substitutes.kinds.map((s) => `${s.label}: ${s.here} here, about ${s.usual} usual, ${s.level}`), passed: c.substitutes.ok },
+      citywide: { percent_of_areas_that_look_the_same: c.citywide.same_pct, passed: c.citywide.ok } },
+    what_if: c.what_if.map((w) => ({ move: `600 m ${w.dir}, toward ${w.toward}`, lat: w.lat, lon: w.lon, here: w.here, usual: w.usual, standing: w.level })),
+    caveat: f.caveat };
+}
+
 // Compact version for the assistant to speak from.
 export function reportForAgent(place: string, radius?: number, budget?: number, at?: { lat: number; lon: number }) {
   const hits = at ? [{ label: place, type: "locality" as const, lat: at.lat, lon: at.lon }] : resolvePlace(place);
@@ -233,6 +275,53 @@ export function reportForAgent(place: string, radius?: number, budget?: number, 
   };
 }
 
+// Kinds that serve some of the same need, so a gap in one may be filled by another.
+const SUBSTITUTES: Record<string, string[]> = {
+  grocery: ["produce"], produce: ["grocery"], bakery: ["cafe", "eatery"], cafe: ["bakery", "eatery"], eatery: ["cafe", "bakery"],
+  pharmacy: ["clinic"], clinic: ["pharmacy"], stationery: ["gifts"], gifts: ["stationery"], salon: ["fitness"], optician: ["clinic"],
+  mobile: ["hardware"], clothing: ["jewellery"], laundry: ["salon"], pets: ["clinic"], tuition: ["stationery"],
+};
+const COMPASS: [string, number, number][] = [["north", 1, 0], ["east", 0, 1], ["south", -1, 0], ["west", 0, -1]];
+
+// Before a claim ("thin" or "crowded") is shown, try to explain it away. Each
+// check asks whether something other than a real gap could produce the same
+// number. What survives sets how firmly the claim may be stated.
+function checks(rep: ReturnType<typeof report>, k: ReturnType<typeof report>["kinds"][number], budget: number | null) {
+  const ki = KINDS.findIndex((x) => x.key === k.key), r = rep.radius_m;
+  // 1. Is the data itself thick enough here?
+  const coverage = { listed: rep.total_listed, level: rep.confidence, ok: rep.confidence === "good" };
+  // 2. Is the picture different just outside the circle?
+  let ring = 0;
+  for (const i of within(rep.lat, rep.lon, r + 400)) if (P!.kind[i] === ki && distM(rep.lat, rep.lon, P!.lat[i], P!.lon[i]) > r) ring++;
+  const ringUsual = k.expected * (((r + 400) ** 2 - r * r) / (r * r));
+  const outside = { within_m: 400, count: ring, usual: Math.round(ringUsual * 10) / 10,
+    ok: k.level === "thin" ? ring <= ringUsual * 0.6 : k.level === "crowded" ? ring >= ringUsual * 0.6 : true };
+  // 3. Does another kind of shop already serve the need?
+  const subs = (SUBSTITUTES[k.key] ?? []).map((key) => rep.kinds.find((x) => x.key === key)!).filter(Boolean)
+    .map((x) => ({ key: x.key, label: x.label, ta: x.ta, hi: x.hi, here: x.count, usual: Math.round(x.expected * 10) / 10, level: x.level }));
+  const substitutes = { kinds: subs, ok: k.level === "thin" ? !subs.some((x) => x.level === "crowded") : k.level === "crowded" ? !subs.some((x) => x.level === "thin") : true };
+  // 4. Is it like this everywhere in the city's data, or only here?
+  const big = meta!.bench.filter((p) => p.total >= 60);
+  const cityShare = median(big.map((p) => p.counts[ki] / p.total));
+  const same = big.filter((p) => { const e = cityShare * p.total, c = p.counts[ki];
+    return k.level === "thin" ? e >= 1.5 && c <= e * 0.5 : k.level === "crowded" ? c >= e * 1.6 && c >= 4 : false; }).length;
+  const citywide = { areas: big.length, same_pct: Math.round((same / Math.max(1, big.length)) * 100), ok: same / Math.max(1, big.length) <= 0.35 };
+  // The number that moved when unlike peers were dropped.
+  const moved = { from: k.expected_by_size, to: k.expected, changed: Math.abs(k.expected_by_size - k.expected) >= 0.1 };
+  // What if: the same shop 600 m away in each direction, and a larger budget.
+  const what_if = COMPASS.map(([dir, dy, dx]) => {
+    const lat = rep.lat + (dy * 600) / M_LAT, lon = rep.lon + (dx * 600) / M_LON;
+    try { const o = report(lat, lon, r), ok = o.kinds[ki]; return { kind: "move" as const, dir, lat, lon, toward: nearestLocality(lat + (dy * 600) / M_LAT, lon + (dx * 600) / M_LON).name, here: ok.count, usual: Math.max(1, Math.round(ok.expected)), level: ok.level, ratio: ok.count / Math.max(1, ok.expected) }; }
+    catch { return null; }
+  }).filter((x): x is NonNullable<typeof x> => !!x).filter((x) => x.level !== k.level).sort((a, b) => a.ratio - b.ratio).slice(0, 2).map(({ ratio, ...x }) => x);
+  const cost = SETUP_LAKH[k.key];
+  const more = budget && cost && cost[0] * 100000 > budget ? { kind: "budget" as const, needs_lakh: cost[0], short_lakh: Math.round((cost[0] - budget / 100000) * 10) / 10 } : null;
+  // How firmly the claim may be stated.
+  const failed = [coverage.ok, outside.ok, substitutes.ok, citywide.ok].filter((x) => !x).length;
+  const strength = k.level === "typical" ? "plain" : rep.confidence === "low" || rep.peer_review.kept < 20 || failed >= 2 ? "direction" : failed === 1 || rep.confidence === "fair" ? "fair" : "firm";
+  return { claim: k.level, strength, coverage, outside, substitutes, citywide, moved, what_if, more };
+}
+
 // For someone who has not opened a shop yet: how one kind of shop would sit in
 // this spot, whether the money covers it, and what else the money could open.
 export function fit(lat: number, lon: number, radius: number, kind: string | null, budget: number | null) {
@@ -247,6 +336,7 @@ export function fit(lat: number, lon: number, radius: number, kind: string | nul
   const options = rep.kinds.filter((k) => k.openable && k.key !== kind && k.level !== "crowded" && k.peer_have >= 50)
     .map(view).filter((o) => !budget || o.within_budget !== false).sort((a, b) => (a.level === "thin" ? 0 : 1) - (b.level === "thin" ? 0 : 1) || b.expected - b.here - (a.expected - a.here)).slice(0, 3);
   return { lat: rep.lat, lon: rep.lon, radius_m: rep.radius_m, locality: rep.locality, locality_ta: rep.locality_ta, total_listed: rep.total_listed, confidence: rep.confidence,
+    peer_review: rep.peer_review, checks: chosen ? checks(rep, chosen, budget) : null,
     budget, chosen: chosen ? view(chosen) : null, options, crowded: rep.crowded.slice(0, 3).map((k) => ({ label: k.label, ta: k.ta, hi: k.hi, here: k.count, expected: k.expected })),
     anchors: rep.anchors, peers: rep.peers, peer_count: rep.peer_count, caveat: rep.caveat, setup_cost_note: "Setup costs are rough illustrative ranges for this prototype, not quotes." };
 }

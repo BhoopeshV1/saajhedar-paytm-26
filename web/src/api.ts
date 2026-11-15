@@ -10,7 +10,14 @@ export type FitKind = KindLite & { here: number; expected: number; peer_have: nu
   setup_lakh: [number, number] | null; within_budget: boolean | null; streets: { name: string; n: number }[] };
 export type Fit = { lat: number; lon: number; radius_m: number; locality: string; locality_ta: string; total_listed: number; confidence: "good" | "fair" | "low"; budget: number | null;
   chosen: FitKind | null; options: FitKind[]; crowded: { label: string; ta: string; hi: string; here: number; expected: number }[];
-  anchors: { key: string; n: number; names: string[] }[]; peers: string[]; peer_count: number; caveat: string; setup_cost_note: string };
+  anchors: { key: string; n: number; names: string[] }[]; peers: string[]; peer_count: number; caveat: string; setup_cost_note: string;
+  peer_review?: { picked: number; kept: number; dropped: { name: string; similarity: number; mostly: string[] }[]; here_mostly: string[] };
+  checks?: { claim: "thin" | "crowded" | "typical"; strength: "firm" | "fair" | "direction" | "plain";
+    coverage: { listed: number; level: string; ok: boolean }; outside: { within_m: number; count: number; usual: number; ok: boolean };
+    substitutes: { kinds: { key: string; label: string; ta: string; hi: string; here: number; usual: number; level: string }[]; ok: boolean };
+    citywide: { areas: number; same_pct: number; ok: boolean }; moved: { from: number; to: number; changed: boolean };
+    what_if: { kind: "move"; dir: string; lat: number; lon: number; toward: string; here: number; usual: number; level: string }[];
+    more: { kind: "budget"; needs_lakh: number; short_lakh: number } | null } | null };
 export type Call = { id: number; at: string; supplier: string; mode: "simulated" | "sarvam"; status: string; via: string; total: number; summary: string; bill_id: number | null;
   lines: { name: string; unit: string; asked: number; qty: number; rate: number; agreed: boolean }[]; transcript: { who: "saajhedar" | "supplier"; text: string }[] };
 export type SyncStatus = { target: { name: string; url: string; demo: boolean } | null; waiting: number; sent: number; failed: number;

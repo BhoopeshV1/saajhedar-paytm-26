@@ -1,6 +1,7 @@
 // First run. Two doors: an owner links their shop, or someone who has not
 // opened one yet checks what a locality is missing before spending anything.
 // The phone check and merchant lookup are simulated; nothing reaches Paytm.
+import { Checked } from "./Checked";
 import { AreaScan } from "./AreaScan";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../store";
@@ -146,6 +147,13 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     setBusy(false);
   };
   const [scanning, setScanning] = useState(false);
+  // A "what if" from the checks: the same question, asked 600 m away.
+  const moveTo = async (lat: number, lon: number, label: string) => {
+    setBusy(true); setError(null);
+    try { const f = await api.areaFit(lat, lon, 800, kind, budget); setPlace({ label, type: "locality", lat, lon, score: 0 } as any); setFit(f); requestAnimationFrame(() => document.querySelector(".welcome .step-name")?.scrollIntoView({ block: "center", behavior: "smooth" })); }
+    catch (e: any) { setError(e.message); }
+    setBusy(false);
+  };
   const check = async () => {
     if (!place) { setError(L("Pick an area first.", "முதலில் ஒரு பகுதியைத் தேர்ந்தெடுங்கள்.", "पहले इलाका चुनिए।")); return; }
     setBusy(true); setError(null); setFit(null); setScanning(true);
@@ -254,6 +262,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
               <i aria-hidden="true" />
               <div className="vs-peer"><b>{Math.round(c.expected)}</b><span>{L("in similar areas", "இதுபோன்ற பகுதிகளில்", "ऐसे इलाकों में")}</span></div>
             </div>
+            {fit.checks?.strength === "direction" && <span className="verdict-near">{L("Thin evidence here. Treat this as a direction, not a number.", "இங்கே சான்று குறைவு. இதை ஒரு திசையாக மட்டும் கொள்ளுங்கள்.", "यहाँ सबूत कमज़ोर है। इसे सिर्फ़ दिशा मानें।")}</span>}
             {c.nearest_m != null && <span className="verdict-near">{L(`Nearest one is ${c.nearest_m} m away`, `அருகிலுள்ளது ${c.nearest_m} மீ தொலைவில்`, `सबसे पास वाली ${c.nearest_m} मी दूर`)}</span>}
             {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "verdict-money-over"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
           </div>
@@ -270,8 +279,9 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
             <div key={o.key} className="opt"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span>{cost(o) && <span className="opt-cost">{cost(o)}</span>}
               <span className="meter" aria-hidden="true"><b style={{ width: `${Math.min(100, (o.here / usual) * 100)}%`, background: o.color }} /></span>
               <span className="opt-n">{L(`${o.here} here, ${usual} in similar areas`, `இங்கே ${o.here}, இதுபோன்ற பகுதிகளில் ${usual}`, `यहाँ ${o.here}, ऐसे इलाकों में ${usual}`)}</span></div>); })}</section>}
-        {fit.peers.length > 0 && <section className="card"><h2 className="card-title">{L(`Compared with ${fit.peer_count} similar areas`, `${fit.peer_count} ஒத்த பகுதிகளுடன் ஒப்பீடு`, `${fit.peer_count} मिलते-जुलते इलाकों से तुलना`)}</h2>
-          <p className="fine">{L("Similar means about as many businesses listed nearby as here. Their usual mix shows what an area this busy tends to have.", "ஒத்த பகுதி என்றால், இங்குள்ள அளவுக்கு அருகில் வணிகங்கள் உள்ள பகுதி. அவற்றின் வழக்கமான கலவை, இவ்வளவு பரபரப்பான பகுதியில் என்ன இருக்கும் என்று காட்டுகிறது.", "मिलता-जुलता यानी आसपास लगभग उतने ही कारोबार। उनका आम मेल बताता है कि इतने व्यस्त इलाके में क्या होता है।")}</p>
+        {c && fit.checks ? <Checked fit={fit} kind={kn(c)} L={L} onMove={moveTo} />
+          : fit.peers.length > 0 && <section className="card"><h2 className="card-title">{L(`Compared with ${fit.peer_count} similar areas`, `${fit.peer_count} ஒத்த பகுதிகளுடன் ஒப்பீடு`, `${fit.peer_count} मिलते-जुलते इलाकों से तुलना`)}</h2>
+          <p className="fine">{L("Similar means about as many businesses listed nearby as here, and a like mix of them.", "ஒத்த பகுதி என்றால், அருகில் இதே அளவு வணிகங்களும் ஒத்த கலவையும் உள்ள பகுதி.", "मिलता-जुलता यानी आसपास लगभग उतने ही कारोबार और वैसा ही मेल।")}</p>
           <div className="tags">{fit.peers.map((n) => <span key={n} className="tag tag-plain">{n}</span>)}</div></section>}
         {fit.anchors.length > 0 && <section className="card"><h2 className="card-title">{L("Who comes here", "யார் வருகிறார்கள்", "यहाँ कौन आता है")}</h2>
           <div className="tags">{fit.anchors.slice(0, 5).map((a) => <span key={a.key} className="tag">{ANCHOR[a.key] ?? a.key}<b>{a.n}</b></span>)}</div></section>}

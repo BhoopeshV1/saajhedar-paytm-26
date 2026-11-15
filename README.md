@@ -55,6 +55,17 @@ The supplier's side of the call is simulated and no phone rings. `web/src/screen
 
 Every open starts on a splash that waits for Proceed. A first visit on a device then opens `web/src/screens/Welcome.tsx` (also under "Welcome and setup" in the menu). "I run a shop" walks through a simulated phone check, shop details, how bills are kept today and a PIN, then calls `POST /api/onboard`. "Thinking of opening one?" asks one thing per page (an area, a kind of shop from a two-pane picker, an investment), plays a short scan (`web/src/screens/AreaScan.tsx`: a line-drawn globe turns to the place, dives to its streets and drops a pin for each such shop already there) and shows `GET /api/area/fit`: how many of that kind are already there against similar areas, whether the money covers the rough setup cost, and what else the area is short of. No SMS, identity check or Paytm account lookup happens.
 
+## How the area answer is checked
+
+`server/area.ts` does not show "thin" or "crowded" from one statistic. For the chosen kind of shop, `GET /api/area/fit` also returns:
+
+- **Peer review.** The 40 localities nearest in size are picked, then each one's mix of businesses is compared with this area's (cosine similarity of shares). Those clearly unlike it are dropped, at least 20 are kept, and the usual number is recomputed from the survivors. The response names the dropped areas and what they lean to.
+- **Four checks that try to explain the number away.** Is enough data listed here; is it different in the next 400 m outside the circle; does a substitute kind (a fixed table in the code) already serve the need; and do many areas across the city look the same, which would point to incomplete listings.
+- **How firmly it may be said.** Firm, fair, or a direction only. When it is a direction only, the result screen and the assistant lead with that.
+- **What if.** The same question 600 m away in each direction, shown as chips that re-run the check there.
+
+`web/src/screens/Checked.tsx` shows this as a flow on the result screen. All of it is plain code. The assistant has the same checks as the `area_check` tool and is told to test its leading options, and try a move or another radius, before it recommends. Peers are still matched on size and mix only; income, rents and footfall are not in the data.
+
 ## Laptop view
 
 On screens 960px and wider the app is drawn inside a device frame, scaled to fit the window: a tablet with a side rail and two columns, or a phone. The switch in the bottom-right corner chooses the frame and the background (plain gradient, a logo wallpaper, or shop doodles). Real phones get no frame. The speaker button in the top bar mutes spoken replies, which also saves speech credits.
