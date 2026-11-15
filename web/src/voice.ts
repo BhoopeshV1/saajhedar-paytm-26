@@ -35,6 +35,9 @@ export class VoiceEngine {
   private ctx: AudioContext | null = null;
   private stream: MediaStream | null = null;
   private node: AudioWorkletNode | null = null;
+  private src: MediaStreamAudioSourceNode | null = null;
+  private tapReady = false;
+  private tried = new Set<string>();
   private outAnalyser: AnalyserNode | null = null;
   private state: VoiceState = "off";
   private h: Handlers;
@@ -87,22 +90,12 @@ export class VoiceEngine {
       const ctx = await this.unlock();
       if (!this.stream) {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser cannot use the microphone here. Open the app over HTTPS.");
-        this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
-        const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
-        await ctx.audioWorklet.addModule(url);
-        URL.revokeObjectURL(url);
-        const src = ctx.createMediaStreamSource(this.stream);
-        this.node = new AudioWorkletNode(ctx, "tap", { numberOfInputs: 1, numberOfOutputs: 1 });
-        this.node.port.onmessage = (e) => this.onFrame(e.data as Float32Array, ctx.sampleRate);
-        src.connect(this.node);
-        // Some browsers (Safari) only run nodes that lead to the speakers, so the tap
-        // is wired to the output through a silent gain.
-        const mute = ctx.createGain(); mute.gain.value = 0;
-        this.node.connect(mute); mute.connect(ctx.destination);
+        this.tried.clear();
+        await this.open(ctx);
       }
       this.resetCapture();
       this.frames = 0; this.peak = 0;
-      const track = this.stream.getAudioTracks()[0];
+      const track = this.stream!.getAudioTracks()[0];
       this.h.onDebug?.("mic-open", { label: track?.label, muted: track?.muted, settings: track?.getSettings?.(), rate: ctx.sampleRate, ctx: ctx.state });
       this.set("listening");
       this.watchMic(); this.report();
@@ -114,25 +107,73 @@ export class VoiceEngine {
     }
   }
 
+  // Opens a microphone (the browser's default, or a named one) and taps its audio.
+  private async open(ctx: AudioContext, deviceId?: string) {
+    this.closeMic();
+    this.stream = await navigator.mediaDevices.getUserMedia({ audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    if (!this.tapReady) {
+      const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
+      await ctx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+      this.tapReady = true;
+    }
+    this.src = ctx.createMediaStreamSource(this.stream);
+    this.node = new AudioWorkletNode(ctx, "tap", { numberOfInputs: 1, numberOfOutputs: 1 });
+    this.node.port.onmessage = (e) => this.onFrame(e.data as Float32Array, ctx.sampleRate);
+    this.src.connect(this.node);
+    // Some browsers (Safari) only run nodes that lead to the speakers, so the tap
+    // is wired to the output through a silent gain.
+    const mute = ctx.createGain(); mute.gain.value = 0;
+    this.node.connect(mute); mute.connect(ctx.destination);
+    const id = this.stream.getAudioTracks()[0]?.getSettings?.().deviceId; if (id) this.tried.add(id);
+  }
+
+  private closeMic() {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    if (this.node) { this.node.port.onmessage = null; this.node.disconnect(); }
+    this.src?.disconnect();
+    this.stream = null; this.node = null; this.src = null;
+  }
+
+  // Some laptops put a virtual "noise-cancelling" microphone first, and it can hand
+  // the browser pure silence. When that happens, move on to the next real microphone.
+  private async nextMic(): Promise<boolean> {
+    try {
+      const all = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput" && d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications");
+      const next = all.find((d) => !this.tried.has(d.deviceId));
+      this.h.onDebug?.("mic-silent", { tried: this.tried.size, available: all.map((d) => d.label), next: next?.label ?? null });
+      if (!next || !this.ctx) return false;
+      this.tried.add(next.deviceId);
+      await this.open(this.ctx, next.deviceId);
+      this.frames = 0; this.peak = 0; this.resetCapture();
+      const track = this.stream!.getAudioTracks()[0];
+      this.h.onDebug?.("mic-open", { label: track?.label, muted: track?.muted, settings: track?.getSettings?.(), rate: this.ctx.sampleRate, ctx: this.ctx.state, switched: true });
+      this.watchMic();
+      return true;
+    } catch (err: any) { this.h.onDebug?.("mic-error", { name: err?.name, message: err?.message, during: "switch" }); return false; }
+  }
+
   // Says so when the microphone is open but nothing is coming through, instead of
   // sitting on "Listening" for ever.
   private watchMic() {
     clearTimeout(this.micTimer);
-    this.micTimer = window.setTimeout(() => {
+    this.micTimer = window.setTimeout(async () => {
       if (!this.stream || this.state === "off") return;
-      const track = this.stream.getAudioTracks()[0];
-      if (this.frames === 0) this.h.onError("The microphone is open but no sound is reaching the app. Reload the page, or type instead.");
-      else if (this.peak < 0.003) this.h.onError(`The microphone${track?.label ? ` (${track.label})` : ""} is silent. Check that it is not muted and that the browser is using the right one, or type instead.`);
-    }, 6000);
+      if (this.frames > 0 && this.peak >= 0.0005) return;                // sound is arriving
+      // Levels are only measured while listening; during a reply, check again afterwards.
+      if (this.state !== "listening" && this.state !== "hearing") { this.watchMic(); return; }
+      const label = this.stream.getAudioTracks()[0]?.label;
+      if (await this.nextMic()) return;
+      this.h.onError(this.frames === 0 ? "The microphone is open but no sound is reaching the app. Reload the page, or type instead."
+        : `${label ? `"${label}"` : "The microphone"} is sending silence. Pick another microphone in the browser's site settings, check it is not muted in Windows, or type instead.`);
+    }, 2500);
   }
 
   // Ends the conversation and releases the microphone.
   stop() {
     clearTimeout(this.micTimer); clearInterval(this.statTimer);
     this.stopSpeaking();
-    this.stream?.getTracks().forEach((t) => t.stop());
-    this.node?.disconnect();
-    this.stream = null; this.node = null;
+    this.closeMic();
     this.resetCapture();
     this.set("off");
     this.h.onLevel(0);
