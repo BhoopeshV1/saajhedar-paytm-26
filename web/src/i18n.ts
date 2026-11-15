@@ -6,7 +6,7 @@ type Entry = [en: string, ta: string, hi: string];
 
 const S = {
   hello: ["Vanakkam", "வணக்கம்", "नमस्ते"],
-  tapToTalk: ["Tap and speak. Ask what needs you today.", "தொட்டுப் பேசுங்கள். இன்று என்ன வேலை என்று கேளுங்கள்.", "दबाकर बोलिए। पूछिए आज क्या ज़रूरी है।"],
+  tapToTalk: ["Tap to speak", "தொட்டுப் பேசுங்கள்", "दबाकर बोलिए"],
   listening: ["Listening", "கேட்கிறேன்", "सुन रहा हूँ"],
   hearing: ["Go on", "சொல்லுங்கள்", "बोलिए"],
   thinking: ["Working on it", "பார்க்கிறேன்", "देख रहा हूँ"],

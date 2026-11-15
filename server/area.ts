@@ -150,7 +150,7 @@ export function report(lat: number, lon: number, radius = 800) {
     total_listed: total, per_km2: Math.round(total / km2), kinds, gaps, crowded, streets,
     off_street: total - [...byStreet.values()].reduce((s, e) => s + e.n, 0),
     anchors: Object.entries(anchors).map(([key, v]) => ({ key, n: v.n, names: v.names })).filter((a) => a.n > 0),
-    peers: peers.slice(0, 5).map((p) => p.name),
+    peers: peers.slice(0, 5).map((p) => p.name), peer_count: peers.length,
     confidence: total >= 150 ? "good" : total >= 50 ? "fair" : "low",
     caveat: "Counts are businesses listed in open map data (Overture Maps, OpenStreetMap). Small shops without an online listing are missing, so treat these as a guide, not a census.",
     sources: meta!.sources,
@@ -248,7 +248,7 @@ export function fit(lat: number, lon: number, radius: number, kind: string | nul
     .map(view).filter((o) => !budget || o.within_budget !== false).sort((a, b) => (a.level === "thin" ? 0 : 1) - (b.level === "thin" ? 0 : 1) || b.expected - b.here - (a.expected - a.here)).slice(0, 3);
   return { lat: rep.lat, lon: rep.lon, radius_m: rep.radius_m, locality: rep.locality, locality_ta: rep.locality_ta, total_listed: rep.total_listed, confidence: rep.confidence,
     budget, chosen: chosen ? view(chosen) : null, options, crowded: rep.crowded.slice(0, 3).map((k) => ({ label: k.label, ta: k.ta, hi: k.hi, here: k.count, expected: k.expected })),
-    anchors: rep.anchors, peers: rep.peers, caveat: rep.caveat, setup_cost_note: "Setup costs are rough illustrative ranges for this prototype, not quotes." };
+    anchors: rep.anchors, peers: rep.peers, peer_count: rep.peer_count, caveat: rep.caveat, setup_cost_note: "Setup costs are rough illustrative ranges for this prototype, not quotes." };
 }
 export const openableKinds = () => KINDS.filter((k) => k.openable).map(({ key, label, ta, hi, color }) => ({ key, label, ta, hi, color }));
 

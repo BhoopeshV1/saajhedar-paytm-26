@@ -1,5 +1,7 @@
 // HTTP server: JSON API, server-sent events, the voice turn endpoint, and the
 // built web app. Run from the app folder so Bun picks up .env.
+import { gate } from "./gate";
+import { callVoice } from "./callvoice";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -122,7 +124,8 @@ const num = (v: string | null, d?: number) => { const n = Number(v); if (v == nu
 
 Bun.serve({
   port: PORT, hostname: "0.0.0.0", idleTimeout: 120,
-  async fetch(req) {
+  async fetch(req, server) {
+    const blocked = await gate(req, server.requestIP(req)?.address); if (blocked) return blocked;
     const url = new URL(req.url); const p = url.pathname; const m = req.method;
     if (!p.startsWith("/api/")) return serveStatic(p);
     try {
@@ -167,6 +170,10 @@ Bun.serve({
       if (p === "/api/reset" && m === "POST") { seed(true); resetSessions(); sync.demoReset(); ops.autopilot(); return json({ ok: true }); }
 
       if (p === "/api/calls" && m === "POST") return json(ops.callSuppliers(await req.json().catch(() => ({})) as any));
+      if (p === "/api/calls/voice") {
+        const bytes = await callVoice(url.searchParams.get("who") || "", url.searchParams.get("text") || "");
+        return bytes ? new Response(bytes as unknown as BodyInit, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=86400" } }) : json({ error: "No voice for this line." }, 404);
+      }
       if (p === "/api/calls/webhook" && m === "POST") return json(ops.callWebhook(await req.json()));
       if (p === "/api/onboard" && m === "POST") { const r = ops.onboard(await req.json() as any); refreshWeather(); return json(r); }
       if (p === "/api/area/kinds") return json(area.openableKinds());

@@ -13,7 +13,7 @@ type Ctx = {
   voice: VoiceState; caption: Caption; busy: boolean;
   quiet: boolean; setQuiet: (q: boolean) => void; toggleVoice: () => void; say: (text: string) => void; tellAssistant: (event: string) => void; stopVoice: () => void;
   levelRef: React.MutableRefObject<number>;
-  pin: Pending | null; closePin: () => void;
+  pin: Pending | null; openPin: (p: Pending) => void; closePin: () => void;
   toasts: Toast[]; toast: (t: Omit<Toast, "id">) => void;
   health: { sarvam: boolean; claude: boolean; area: { ready: boolean } } | null;
   refresh: () => void;
@@ -37,6 +37,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
   const [caption, setCaption] = useState<Caption>(null);
   const [busy, setBusy] = useState(false);
   const [pin, setPin] = useState<Pending | null>(null);
+  const inTurn = useRef(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [health, setHealth] = useState<Ctx["health"]>(null);
   const levelRef = useRef(0);
@@ -58,7 +59,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
     const eng = engine.current!;
     abortRef.current?.abort();
     const ac = new AbortController(); abortRef.current = ac;
-    setBusy(true);
+    setBusy(true); inTurn.current = true;
     if (eng.current !== "off") eng.setThinking();
     let gotAudio = false;
     eng.beginReply(() => { eng.resume(); });
@@ -81,6 +82,7 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
     } catch (err: any) {
       if (err?.name !== "AbortError") setCaption({ who: "error", text: "Could not reach the server. Check the connection and try again." });
     }
+    inTurn.current = false;
     if (!ac.signal.aborted) {
       if (!gotAudio) eng.endReply();
       setBusy(false);
@@ -130,7 +132,8 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
         let e: any; try { e = JSON.parse(m.data); } catch { return; }
         if (e.type === "refresh" || e.type === "hello") refresh();
         if (persona !== "owner") return;
-        if (e.type === "pin") setPin(e.pending);
+        // Asked for by voice just now: open the PIN sheet. Anything else waits in the notice on screen.
+        if (e.type === "pin") { if (inTurn.current) setPin(e.pending); else { refresh(); toast({ title: e.pending.summary, body: "Waiting for your PIN", tone: "info" }); } }
         if (e.type === "order") {
           refresh();
           toast({ title: `New order from ${e.customer}`, body: `${e.lines.length} items, ₹${e.total}`, tone: "info" });
@@ -146,13 +149,14 @@ export function AppProvider({ persona, customerId, children }: { persona: "owner
   }, [persona, refresh, toast]);
 
   // If the page loads with something already waiting for a PIN, show it.
-  useEffect(() => { if (persona === "owner" && !pin && state?.pending.length) setPin(state.pending[0]); }, [state?.pending.length]); // eslint-disable-line
+  // Things waiting for the PIN are listed on screen (Waiting); the sheet opens only when the owner taps one,
+  // or when they have just asked the assistant for it by voice.
 
-  const go = useCallback((s: Screen) => { setScreen(s); setFocus(null); window.scrollTo({ top: 0 }); document.querySelector(".shell")?.scrollTo({ top: 0 }); }, []);
+  const go = useCallback((s: Screen) => { setScreen(s); setFocus(null); window.scrollTo({ top: 0 }); document.querySelector(".shell > main")?.scrollTo({ top: 0 }); }, []);
   const closePin = useCallback(() => setPin(null), []);
 
   const value = useMemo<Ctx>(() => ({ quiet, setQuiet, state, lang, setLang, screen, go, focus, setFocus, voice, caption, busy, toggleVoice, say, tellAssistant, stopVoice, levelRef,
-    pin, closePin, toasts, toast, health, refresh, act }),
+    pin, openPin: setPin, closePin, toasts, toast, health, refresh, act }),
     [quiet, setQuiet, state, lang, setLang, screen, go, focus, voice, caption, busy, toggleVoice, say, tellAssistant, stopVoice, pin, closePin, toasts, toast, health, refresh, act]);
   return <C.Provider value={value}>{children}</C.Provider>;
 }

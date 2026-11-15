@@ -5,7 +5,7 @@ import { IconChevron, IconCheck, JOB_ICON } from "../icons";
 import { Outlook } from "./Outlook";
 
 export function Home() {
-  const { state, lang, go, setFocus } = useApp();
+  const { state, lang, go, setFocus, openPin } = useApp();
   if (!state) return <div className="skeleton" />;
   const o = state.overview;
   const fest = o.stock.festival;
@@ -13,7 +13,7 @@ export function Home() {
 
   // What actually needs the owner, most pressing first.
   const needs: { key: string; job: Screen; title: string; detail: string; onClick: () => void }[] = [];
-  for (const p of state.pending) needs.push({ key: "p" + p.id, job: "rules", title: p.summary, detail: t("needsPin", lang), onClick: () => go(p.kind === "pay_bill" || p.kind === "take_loan" ? "pay" : "rules") });
+  for (const p of state.pending) needs.push({ key: "p" + p.id, job: "rules", title: p.summary, detail: t("needsPin", lang), onClick: () => openPin(p) });
   const fresh = state.orders.filter((x) => x.status === "new");
   if (fresh.length) needs.push({ key: "orders", job: "sell", title: `${fresh.length} ${t(fresh.length === 1 ? "orderWaiting" : "ordersWaiting", lang)}`, detail: fresh.map((x) => x.customer).join(", "), onClick: () => go("sell") });
   const wrong = state.bills.find((b) => b.status !== "paid" && b.overcharge > 0);

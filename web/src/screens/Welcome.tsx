@@ -1,14 +1,26 @@
 // First run. Two doors: an owner links their shop, or someone who has not
 // opened one yet checks what a locality is missing before spending anything.
 // The phone check and merchant lookup are simulated; nothing reaches Paytm.
-import { useEffect, useState } from "react";
+import { AreaScan } from "./AreaScan";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../store";
 import { api, inr, type AreaHit, type Fit, type FitKind, type KindLite, type Lang } from "../api";
 import { IconCheck, IconChevron } from "../icons";
 import { handoff, lakh, askFor } from "../plan";
 import { StartKit } from "./StartKit";
 
-type Step = "start" | "phone" | "otp" | "shop" | "books" | "pin" | "fence" | "fit";
+type Step = "start" | "phone" | "otp" | "shop" | "books" | "pin" | "fence" | "kind" | "money" | "fit";
+// Kinds of shop, grouped for the two-pane picker: groups down the left, shops on the right.
+const GROUPS: { key: string; name: [string, string, string]; kinds: string[]; icon: string }[] = [
+  { key: "daily", name: ["Daily needs", "அன்றாடத் தேவை", "रोज़ की ज़रूरत"], kinds: ["grocery", "produce", "bakery"], icon: "M4 10h16l-1.5 9h-13zM8 10l3-6M16 10l-3-6" },
+  { key: "food", name: ["Eating out", "உணவு", "खाना-पीना"], kinds: ["eatery", "cafe"], icon: "M5 9h11v5a5 5 0 0 1-10 0zM16 10h2a2 2 0 0 1 0 4h-2M8 3v3M12 3v3M5 20h12" },
+  { key: "care", name: ["Health and care", "உடல்நலம்", "सेहत और देखभाल"], kinds: ["pharmacy", "optician", "salon", "fitness"], icon: "M12 20s-7-4.4-7-9.5A4 4 0 0 1 12 8a4 4 0 0 1 7 2.5c0 5.1-7 9.5-7 9.5zM12 11v4M10 13h4" },
+  { key: "style", name: ["Fashion and gifts", "உடை, பரிசு", "फ़ैशन और गिफ़्ट"], kinds: ["clothing", "gifts"], icon: "M9 4l3 2 3-2 5 3-2 4-2-1v10H8V10l-2 1-2-4z" },
+  { key: "tech", name: ["Electronics and repair", "எலக்ட்ரானிக்ஸ், பழுது", "इलेक्ट्रॉनिक्स और मरम्मत"], kinds: ["mobile", "hardware", "auto"], icon: "M14 6a4 4 0 0 0-5 5l-5 5 2 2 5-5a4 4 0 0 0 5-5l-2.5 2.5-2-2z" },
+  { key: "service", name: ["Services", "சேவைகள்", "सेवाएँ"], kinds: ["stationery", "tuition", "laundry", "pets"], icon: "M6 4h9l3 3v13H6zM9 10h6M9 14h6" },
+];
+const SHOP = "M4 10l1.5-5h13L20 10M4 10v10h16V10M4 10a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0M10 20v-5h4v5";
+const Glyph = ({ d, size = 22 }: { d: string; size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
 const BUDGETS = [100000, 300000, 500000, 1000000, 2000000];
 const LANGS: [Lang, string][] = [["en-IN", "English"], ["ta-IN", "தமிழ்"], ["hi-IN", "हिंदी"]];
 const ANCHOR: Record<string, string> = { worship: "places of worship", college: "colleges", school: "schools", hospital: "hospitals", transit: "bus and train stops", office: "offices", mall: "malls", cinema: "cinemas", park: "parks" };
@@ -24,18 +36,57 @@ function Locality({ value, onPick, L }: { value: AreaHit | null; onPick: (h: Are
   if (value) return <div className="picks"><button className="pick on" onClick={() => onPick(null)}>{value.label} ✕</button></div>;
   return (<>
     <input className="field" placeholder={L("Area or street, e.g. Tambaram", "பகுதி அல்லது தெரு, எ.கா. தாம்பரம்", "इलाका या गली, जैसे तांबरम")} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Area or street" />
-    {hits.length > 0 && <div className="hits">{hits.slice(0, 5).map((h) => <button key={h.label + h.lat} onClick={() => { onPick(h); setQ(""); setHits([]); }}>{h.label} <span className="muted">{h.type === "street" ? L("street", "தெரு", "गली") : ""}</span></button>)}</div>}
+    {hits.length > 0 && <div className="hits hits-below">{hits.slice(0, 5).map((h) => <button key={h.label + h.lat} onClick={() => { onPick(h); setQ(""); setHits([]); }}>{h.label} <span className="muted">{h.type === "street" ? L("street", "தெரு", "गली") : ""}</span></button>)}</div>}
   </>);
 }
 
 // Shown every time the app opens, over whatever screen is loading underneath.
 // It stays until Proceed is tapped.
+// Laptop phone frame only: a compact language picker beside the camera cut-out.
+function LangDrop({ dark }: { dark: boolean }) {
+  const { lang, setLang } = useApp();
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: Event) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", away); document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  return (
+    <div ref={box} className={`lang-drop ${dark ? "lang-drop-dark" : ""}`}>
+      <button className="lang-pill" aria-haspopup="listbox" aria-expanded={open} aria-label="Language" onClick={() => setOpen(!open)}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18" /></svg>
+        <span>{lang.slice(0, 2).toUpperCase()}</span>
+      </button>
+      {open && (
+        <ul className="lang-menu" role="listbox">
+          {LANGS.map(([l, n]) => (
+            <li key={l}><button role="option" aria-selected={lang === l} onClick={() => { setLang(l); setOpen(false); }}>
+              <span>{n}</span>{lang === l && <IconCheck size={15} />}
+            </button></li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export function Splash({ onDone }: { onDone: () => void }) {
   const { lang, setLang } = useApp();
   const L = (en: string, ta: string, hi: string) => (lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en);
+  // While the splash is up, the page behind it must not scroll, and the phone's
+  // status bar takes the splash colour.
+  useEffect(() => {
+    const root = document.documentElement, meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]'), was = meta?.content;
+    root.classList.add("splash-open"); if (meta) meta.content = "#002970";
+    return () => { root.classList.remove("splash-open"); if (meta && was) meta.content = was; };
+  }, []);
   return (
     <div className="splash">
-      <div className="seg splash-lang">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
+      <LangDrop dark={true} />
+      <div className="seg lang-seg splash-lang">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
       <span className="soap" aria-hidden="true"><i className="b-rim" /><i className="b-core" /><i className="b-shine" /></span>
       <span className="splash-name">Saajhedar</span>
       <span className="splash-line">{L("Your shop's partner", "உங்கள் கடையின் துணை", "आपकी दुकान का साथी")}</span>
@@ -68,7 +119,12 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
   useEffect(() => { api.kinds().then(setKinds).catch(() => {}); }, []);
   useEffect(() => { window.scrollTo({ top: 0 }); setError(null); }, [step]);
 
-  const prev: Record<Step, Step> = { start: "start", phone: "start", otp: "phone", shop: "otp", books: "shop", pin: "books", fence: "start", fit: "fence" };
+  // The shop picker is one page used from two places: the on-the-fence path and shop setup.
+  const [kindFor, setKindFor] = useState<"fence" | "shop">("fence");
+  const [group, setGroup] = useState(GROUPS[0].key);
+  const [find, setFind] = useState("");
+  const prev: Record<Step, Step> = { start: "start", phone: "start", otp: "phone", shop: "otp", books: "shop", pin: "books", fence: "start", kind: kindFor === "shop" ? "shop" : "fence", money: "kind", fit: "money" };
+  const openKinds = (from: "fence" | "shop") => { setKindFor(from); setFind(""); setGroup(GROUPS.find((g) => kind && g.kinds.includes(kind))?.key ?? GROUPS[0].key); setStep("kind"); };
   const stage = step === "phone" || step === "otp" ? 1 : step === "shop" || step === "books" ? 2 : 3;
 
   const finish = async () => {
@@ -80,10 +136,12 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     } catch (e: any) { setError(e.message); }
     setBusy(false);
   };
+  const [scanning, setScanning] = useState(false);
   const check = async () => {
     if (!place) { setError(L("Pick an area first.", "முதலில் ஒரு பகுதியைத் தேர்ந்தெடுங்கள்.", "पहले इलाका चुनिए।")); return; }
-    setBusy(true); setError(null);
-    try { setFit(await api.areaFit(place.lat, place.lon, 800, kind, budget)); setStep("fit"); } catch (e: any) { setError(e.message); }
+    setBusy(true); setError(null); setFit(null); setScanning(true);
+    // The scan plays while this loads and moves on to the result itself.
+    try { setFit(await api.areaFit(place.lat, place.lon, 800, kind, budget)); } catch (e: any) { setScanning(false); setError(e.message); }
     setBusy(false);
   };
   const toMap = (ask: boolean) => {
@@ -98,87 +156,124 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
     <div className="welcome-top">
       {step === "start" ? <span />
         : <button className="icon-btn" onClick={() => setStep(prev[step])} aria-label="Back"><Back /></button>}
-      <div className="seg">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
+      <LangDrop dark={false} />
+      <div className="seg lang-seg">{LANGS.map(([l, n]) => <button key={l} className={`seg-btn ${lang === l ? "on" : ""}`} onClick={() => setLang(l)}>{n}</button>)}</div>
     </div>
   );
-  const KindPicks = ({ none }: { none?: boolean }) => (
-    <div className="picks">
-      {none && <button className={`pick ${kind == null ? "on" : ""}`} onClick={() => setKind(null)}>{L("Not sure yet", "இன்னும் தெரியவில்லை", "अभी तय नहीं")}</button>}
-      {kinds.map((k) => <button key={k.key} className={`pick ${kind === k.key ? "on" : ""}`} onClick={() => setKind(k.key)}>{kn(k)}</button>)}
-    </div>
-  );
-
   if (step === "start") return (
     <div className="welcome">
       {top}
       <h1 className="brand">Saajhedar</h1>
-      <p className="brand-sub">{L("A partner for your shop. It sells, stocks, pays and collects, by voice.", "உங்கள் கடைக்கு ஒரு துணை. குரலால் விற்கும், சரக்கு வாங்கும், பணம் கட்டும், வசூலிக்கும்.", "आपकी दुकान का साथी। बोलकर बेचता, माल मँगाता, भुगतान और वसूली करता है।")}</p>
+      <p className="brand-sub">{L("Your shop's partner, by voice.", "குரலால் இயங்கும் உங்கள் கடையின் துணை.", "बोलकर चलने वाला, आपकी दुकान का साथी।")}</p>
       <button className="door" onClick={() => { setFresh(false); setStep("phone"); }}>
         <span className="door-title">{L("I run a shop", "எனக்கு ஒரு கடை இருக்கிறது", "मेरी दुकान है")}</span><IconChevron />
-        <span className="door-text">{L("Link your merchant account and set up in about two minutes.", "உங்கள் வணிகக் கணக்கை இணைத்து இரண்டு நிமிடத்தில் தொடங்குங்கள்.", "अपना मर्चेंट खाता जोड़ें, दो मिनट में शुरू करें।")}</span>
+        <span className="door-text">{L("Set up in two minutes.", "இரண்டு நிமிடத்தில் தொடங்குங்கள்.", "दो मिनट में शुरू करें।")}</span>
       </button>
       <button className="door door-fence" onClick={() => setStep("fence")}>
-        <span className="door-title">{L("Still on the fence about starting one?", "கடை தொடங்கலாமா என்று யோசனையா?", "दुकान खोलें या नहीं, सोच रहे हैं?")}</span><IconChevron />
-        <span className="door-text">{L("Tell us the shop you have in mind and what you can invest. See who is already there and what the area is missing.", "மனதில் உள்ள கடையையும் முதலீட்டையும் சொல்லுங்கள். அங்கே யார் இருக்கிறார்கள், எது குறைவு என்று பாருங்கள்.", "मन में जो दुकान है और जितना लगा सकते हैं, बताइए। देखिए वहाँ कौन है और क्या कम है।")}</span>
+        <span className="door-title">{L("Thinking of opening one?", "கடை தொடங்க யோசனையா?", "दुकान खोलने की सोच रहे हैं?")}</span><IconChevron />
+        <span className="door-text">{L("See who is already there, and what the area is missing.", "அங்கே யார் இருக்கிறார்கள், எது குறைவு என்று பாருங்கள்.", "देखिए वहाँ कौन है और क्या कम है।")}</span>
       </button>
       <button className="link" onClick={() => onDone("demo")}>{L("Skip to the demo shop", "மாதிரிக் கடைக்குச் செல்", "डेमो दुकान देखें")}</button>
-      <p className="fine">{L("Not a Paytm product. Account linking, payments and loans here are simulated.", "இது Paytm தயாரிப்பு அல்ல. கணக்கு இணைப்பு, பணம், கடன் அனைத்தும் மாதிரி.", "यह Paytm का उत्पाद नहीं है। खाता जोड़ना, भुगतान और लोन यहाँ नकली हैं।")}</p>
+      <p className="fine">{L("Not a Paytm product. Payments and loans are simulated.", "இது Paytm தயாரிப்பு அல்ல. பணம், கடன் அனைத்தும் மாதிரி.", "यह Paytm का उत्पाद नहीं है। भुगतान और लोन नकली हैं।")}</p>
     </div>
   );
 
   if (step === "fence") return (
     <div className="welcome">
       {top}
-      <h1 className="h-step">{L("What would you open, and where?", "எந்தக் கடை, எங்கே?", "कौन सी दुकान, कहाँ?")}</h1>
-      <p className="lede">{L("Three answers. Then a plain picture of the competition around that spot.", "மூன்று பதில்கள். பிறகு அந்த இடத்தைச் சுற்றியுள்ள போட்டியின் தெளிவான படம்.", "तीन जवाब। फिर उस जगह के आसपास की प्रतिस्पर्धा की साफ़ तस्वीर।")}</p>
+      <h1 className="h-step">{L("Where would you open?", "எங்கே தொடங்க நினைக்கிறீர்கள்?", "कहाँ खोलना चाहते हैं?")}</h1>
       <div className="form">
-        <div className="lab">{L("Where", "எங்கே", "कहाँ")}<Locality value={place} onPick={setPlace} L={L} /></div>
-        <div className="lab">{L("What kind of shop", "எந்த வகைக் கடை", "किस तरह की दुकान")}<KindPicks none /></div>
-        <div className="lab">{L("How much can you put in", "எவ்வளவு முதலீடு செய்ய முடியும்", "कितना लगा सकते हैं")}
-          <div className="picks">{BUDGETS.map((b) => <button key={b} className={`pick ${budget === b ? "on" : ""}`} onClick={() => setBudget(b)}>{lakh(b)}</button>)}</div></div>
+        <div className="lab">{L("Area or street", "பகுதி அல்லது தெரு", "इलाका या गली")}<Locality value={place} onPick={setPlace} L={L} /></div>
       </div>
       {error && <p className="warn-line">{error}</p>}
-      <button className="btn btn-primary" onClick={check} disabled={busy}>{L("Show me the area", "பகுதியைக் காட்டு", "इलाका दिखाएँ")}</button>
       <p className="fine">{L("Covers Chennai and its suburbs in this prototype.", "இந்த முன்மாதிரி சென்னை மற்றும் புறநகரை மட்டும் உள்ளடக்கியது.", "इस प्रोटोटाइप में केवल चेन्नई और उपनगर शामिल हैं।")}</p>
+      <button className="btn btn-primary" onClick={() => { if (!place) { setError(L("Pick an area first.", "முதலில் ஒரு பகுதியைத் தேர்ந்தெடுங்கள்.", "पहले इलाका चुनिए।")); return; } openKinds("fence"); }}>{L("Next", "அடுத்து", "आगे")}</button>
+    </div>
+  );
+
+  if (step === "kind") {
+    const q = find.trim().toLowerCase();
+    const shown = q ? kinds.filter((k) => [k.label, k.ta, k.hi].some((n) => n.toLowerCase().includes(q))) : kinds.filter((k) => GROUPS.find((g) => g.key === group)?.kinds.includes(k.key));
+    const done = () => setStep(kindFor === "shop" ? "shop" : "money");
+    return (
+      <div className="welcome kp-page">
+        {top}
+        <h1 className="h-step">{L("What kind of shop?", "எந்த வகைக் கடை?", "किस तरह की दुकान?")}</h1>
+        <input className="field kp-find" type="search" placeholder={L("Search", "தேடு", "खोजें")} value={find} onChange={(e) => setFind(e.target.value)} aria-label={L("Search kinds of shop", "கடை வகைகளைத் தேடு", "दुकान के प्रकार खोजें")} />
+        <div className="kp">
+          <div className="kp-rail" role="tablist" aria-orientation="vertical">
+            {GROUPS.map((g) => <button key={g.key} role="tab" aria-selected={!q && group === g.key} className={`kp-group ${!q && group === g.key ? "on" : ""}`} onClick={() => { setFind(""); setGroup(g.key); }}>
+              <span className="kp-ico"><Glyph d={g.icon} /></span>{L(...g.name)}</button>)}
+          </div>
+          <div className="kp-cards">
+            {shown.map((k) => <button key={k.key} className={`kp-card ${kind === k.key ? "on" : ""}`} aria-pressed={kind === k.key} onClick={() => setKind(k.key)}>
+              <span className="kp-shop" style={{ color: k.color }}><Glyph d={SHOP} size={30} /></span>{kn(k)}</button>)}
+            {shown.length === 0 && <p className="fine kp-none">{L("Nothing matches. Try another word.", "பொருந்தவில்லை. வேறு சொல்லை முயலுங்கள்.", "कुछ नहीं मिला। दूसरा शब्द आज़माएँ।")}</p>}
+            {kindFor === "fence" && !q && <button className={`kp-card kp-unsure ${kind == null ? "on" : ""}`} aria-pressed={kind == null} onClick={() => setKind(null)}>{L("Not sure yet. Show me what the area needs.", "இன்னும் தெரியவில்லை. பகுதிக்கு என்ன தேவை என்று காட்டு.", "अभी तय नहीं। दिखाइए इलाके को क्या चाहिए।")}</button>}
+          </div>
+        </div>
+        <button className="btn btn-primary kp-confirm" onClick={done} disabled={kindFor === "shop" && !kind}>{L("Confirm", "உறுதிசெய்", "पक्का करें")}</button>
+      </div>
+    );
+  }
+
+  if (step === "money") return (
+    <div className="welcome">
+      {top}
+      <h1 className="h-step">{L("How much can you put in?", "எவ்வளவு முதலீடு செய்ய முடியும்?", "कितना लगा सकते हैं?")}</h1>
+      <div className="money-picks">{BUDGETS.map((b) => <button key={b} className={`money-pick ${budget === b ? "on" : ""}`} aria-pressed={budget === b} onClick={() => setBudget(b)}>{lakh(b)}</button>)}</div>
+      {error && <p className="warn-line">{error}</p>}
+      <button className="btn btn-primary" onClick={check} disabled={busy}>{L("Show me the area", "பகுதியைக் காட்டு", "इलाका दिखाएँ")}</button>
+      {scanning && place && <AreaScan lat={place.lat} lon={place.lon} label={place.label} kind={kind} ready={fit != null} L={L} onDone={() => { setScanning(false); setStep("fit"); }} />}
     </div>
   );
 
   if (step === "fit" && fit) {
     const c = fit.chosen;
     const word = (k: FitKind) => k.level === "thin" ? L("Room for one more", "இன்னொன்றுக்கு இடம் உண்டு", "एक और की जगह है") : k.level === "crowded" ? L("Already crowded", "ஏற்கனவே நெரிசல்", "पहले से भीड़") : L("About average", "சராசரி அளவு", "लगभग औसत");
-    const cost = (k: FitKind) => k.setup_lakh ? `₹${k.setup_lakh[0]} to ${k.setup_lakh[1]} lakh` : null;
+    const cost = (k: FitKind) => k.setup_lakh ? `₹${k.setup_lakh[0]}–${k.setup_lakh[1]} lakh` : null;
     return (
-      <div className="welcome">
+      <div className="welcome arrive">
         {top}
-        <p className="step-name">{place?.label ?? fit.locality}, {L("within", "சுற்றளவு", "दायरा")} {fit.radius_m} m</p>
+        <p className="step-name">{place?.label ?? fit.locality}, {fit.radius_m} m</p>
         {c ? (
           <div className={`verdict ${c.level}`}>
             <span className="verdict-word">{kn(c)}</span>
             <span className="verdict-line">{word(c)}</span>
-            <p>{c.here} here. Areas like this one usually have about {Math.round(c.expected)}.{c.nearest_m != null ? ` The nearest is ${c.nearest_m} m away.` : ""}</p>
-            {cost(c) && <p>{c.within_budget ? `Your ${lakh(budget)} is within the rough ${cost(c)} it takes to open one.` : `Opening one takes roughly ${cost(c)}, which is more than your ${lakh(budget)}.`}</p>}
+            <div className="vs">
+              <div><b>{c.here}</b><span>{L("here", "இங்கே", "यहाँ")}</span></div>
+              <i aria-hidden="true" />
+              <div className="vs-peer"><b>{Math.round(c.expected)}</b><span>{L("in similar areas", "இதுபோன்ற பகுதிகளில்", "ऐसे इलाकों में")}</span></div>
+            </div>
+            {c.nearest_m != null && <span className="verdict-near">{L(`Nearest one is ${c.nearest_m} m away`, `அருகிலுள்ளது ${c.nearest_m} மீ தொலைவில்`, `सबसे पास वाली ${c.nearest_m} मी दूर`)}</span>}
+            {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "short"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
           </div>
         ) : (
           <div className="verdict">
             <span className="verdict-word">{lakh(budget)}</span>
-            <span className="verdict-line">{fit.options.length ? L("Here is what this area is short of", "இந்தப் பகுதியில் குறைவாக உள்ளவை", "इस इलाके में ये कम हैं") : L("Nothing stands out as missing here", "இங்கே குறை எதுவும் தெரியவில்லை", "यहाँ कोई कमी नहीं दिखती")}</span>
+            <span className="verdict-line">{fit.options.length ? L("What this area is short of", "இந்தப் பகுதியில் குறைவாக உள்ளவை", "इस इलाके में ये कम हैं") : L("Nothing stands out as missing", "குறை எதுவும் தெரியவில்லை", "कोई कमी नहीं दिखती")}</span>
           </div>
         )}
-        <div className="facts">
-          <div className="fact"><b>{fit.total_listed}</b><span>businesses listed around this spot</span></div>
-          <div className="fact"><b>{c ? c.here : fit.options.length}</b><span>{c ? `${kn(c).toLowerCase()} shops already here` : "kinds of shop that fit your money"}</span></div>
-        </div>
-        {c && c.streets.length > 0 && <section className="card"><h2 className="card-title">Some of the streets they are on</h2>
-          {c.streets.map((s) => <div key={s.name} className="alt"><i style={{ background: c.color }} /><span className="row-title">{s.name}</span><span className="bill-amt">{s.n}</span></div>)}</section>}
-        {fit.options.length > 0 && <section className="card"><h2 className="card-title">{c ? "Also worth a look for your money" : "Worth a look for your money"}</h2>
-          {fit.options.map((o) => <div key={o.key} className="alt"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span><span className="chip chip-good">{word(o)}</span>
-            <span className="row-detail">{o.here} here, similar areas have about {Math.round(o.expected)}{cost(o) ? `. Roughly ${cost(o)} to open` : ""}</span></div>)}</section>}
-        {fit.anchors.length > 0 && <section className="card"><h2 className="card-title">What brings people here</h2>
-          <p className="lede">{fit.anchors.slice(0, 5).map((a) => `${a.n} ${ANCHOR[a.key] ?? a.key}`).join(", ")}.</p></section>}
-        {fit.crowded.length > 0 && <p className="fine">Already crowded here: {fit.crowded.map((k) => `${kn(k).toLowerCase()} (${k.here})`).join(", ")}.</p>}
-        <p className="fine">{fit.caveat} {fit.setup_cost_note}</p>
+        {c && c.streets.length > 0 && <section className="card"><h2 className="card-title">{L("Where they are", "எங்கே உள்ளன", "कहाँ हैं")}</h2>
+          <div className="tags">{c.streets.map((s) => <span key={s.name} className="tag">{s.name}<b>{s.n}</b></span>)}</div></section>}
+        {fit.options.length > 0 && <section className="card"><h2 className="card-title">{c ? L("Other options", "மற்ற வாய்ப்புகள்", "और विकल्प") : L("Options", "வாய்ப்புகள்", "विकल्प")}</h2>
+          {fit.options.slice(0, 4).map((o) => { const usual = Math.max(1, Math.round(o.expected)); return (
+            <div key={o.key} className="opt"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span>{cost(o) && <span className="opt-cost">{cost(o)}</span>}
+              <span className="meter" aria-hidden="true"><b style={{ width: `${Math.min(100, (o.here / usual) * 100)}%`, background: o.color }} /></span>
+              <span className="opt-n">{L(`${o.here} here, ${usual} in similar areas`, `இங்கே ${o.here}, இதுபோன்ற பகுதிகளில் ${usual}`, `यहाँ ${o.here}, ऐसे इलाकों में ${usual}`)}</span></div>); })}</section>}
+        {fit.peers.length > 0 && <section className="card"><h2 className="card-title">{L(`Compared with ${fit.peer_count} similar areas`, `${fit.peer_count} ஒத்த பகுதிகளுடன் ஒப்பீடு`, `${fit.peer_count} मिलते-जुलते इलाकों से तुलना`)}</h2>
+          <p className="fine">{L("Similar means about as many businesses listed nearby as here. Their usual mix shows what an area this busy tends to have.", "ஒத்த பகுதி என்றால், இங்குள்ள அளவுக்கு அருகில் வணிகங்கள் உள்ள பகுதி. அவற்றின் வழக்கமான கலவை, இவ்வளவு பரபரப்பான பகுதியில் என்ன இருக்கும் என்று காட்டுகிறது.", "मिलता-जुलता यानी आसपास लगभग उतने ही कारोबार। उनका आम मेल बताता है कि इतने व्यस्त इलाके में क्या होता है।")}</p>
+          <div className="tags">{fit.peers.map((n) => <span key={n} className="tag tag-plain">{n}</span>)}</div></section>}
+        {fit.anchors.length > 0 && <section className="card"><h2 className="card-title">{L("Who comes here", "யார் வருகிறார்கள்", "यहाँ कौन आता है")}</h2>
+          <div className="tags">{fit.anchors.slice(0, 5).map((a) => <span key={a.key} className="tag">{ANCHOR[a.key] ?? a.key}<b>{a.n}</b></span>)}</div></section>}
+        <details className="about"><summary>{L("About these numbers", "இந்த எண்களைப் பற்றி", "इन आँकड़ों के बारे में")}</summary>
+          <p className="fine">{fit.total_listed} businesses are listed around this spot. {fit.caveat} {fit.setup_cost_note}</p>
+          {fit.crowded.length > 0 && <p className="fine">Already crowded here: {fit.crowded.map((k) => `${kn(k).toLowerCase()} (${k.here})`).join(", ")}.</p>}</details>
         <StartKit chosen={c} budget={budget} kit={kit} setKit={setKit} L={L} />
-        {health?.claude && <button className="btn btn-primary" onClick={() => toMap(true)}>{L("Ask Saajhedar what it would open", "சாஜேதாரிடம் கேளுங்கள்", "साझेदार से पूछें")}</button>}
+        {health?.claude && <div className="ai-ask"><button className="btn btn-ai" onClick={() => toMap(true)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6a3 3 0 0 0 1.9 1.9L21.4 11.4l-5.6 1.9a3 3 0 0 0-1.9 1.9L12 20.8l-1.9-5.6a3 3 0 0 0-1.9-1.9L2.6 11.4l5.6-1.9a3 3 0 0 0 1.9-1.9zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z" /></svg>
+          {L("Ask Saajhedar AI what to open", "சாஜேதார் AI-யிடம் கேளுங்கள்", "साझेदार AI से पूछें क्या खोलें")}</button>
+          <p className="fine">{L("It reads these numbers and answers aloud with two or three picks, each with a reason and a risk.", "இந்த எண்களைப் படித்து, இரண்டு மூன்று தேர்வுகளை காரணத்துடனும் ஆபத்துடனும் சொல்லும்.", "यह ये आँकड़े पढ़कर दो-तीन विकल्प बताता है, हर एक की वजह और जोखिम के साथ।")}</p></div>}
         <button className="btn btn-outline" onClick={() => toMap(false)}>{L("See it on the map", "வரைபடத்தில் பார்", "नक्शे पर देखें")}</button>
         <button className="link" onClick={() => { setFresh(true); setStep("phone"); }}>{L("I have decided. Set up my shop", "முடிவு செய்துவிட்டேன். என் கடையை அமை", "तय कर लिया। मेरी दुकान सेट करें")}</button>
       </div>
@@ -216,7 +311,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
         <div className="form">
           <label>{L("Shop name", "கடையின் பெயர்", "दुकान का नाम")}<input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Sri Murugan Stores" /></label>
           <label>{L("Your name", "உங்கள் பெயர்", "आपका नाम")}<input className="field" value={owner} onChange={(e) => setOwner(e.target.value)} placeholder="Selvam" autoComplete="given-name" /></label>
-          <div className="lab">{L("What kind of shop", "எந்த வகைக் கடை", "किस तरह की दुकान")}<KindPicks /></div>
+          <div className="lab">{L("What kind of shop", "எந்த வகைக் கடை", "किस तरह की दुकान")}<button className="field kp-open" onClick={() => openKinds("shop")}><span>{kind ? kn(kinds.find((k) => k.key === kind) ?? { label: kind, ta: kind, hi: kind }) : L("Choose", "தேர்ந்தெடுங்கள்", "चुनें")}</span><IconChevron dir="down" /></button></div>
           <div className="lab">{L("Where it is", "எங்கே உள்ளது", "कहाँ है")}<Locality value={place} onPick={setPlace} L={L} /></div>
         </div>
         {kind && kind !== "grocery" && <p className="fine">The prototype's item list and suppliers are a grocery's, whatever kind is picked here.</p>}

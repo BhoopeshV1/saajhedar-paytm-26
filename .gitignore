@@ -6,3 +6,5 @@ data/*.sqlite*
 data/raw/*.pbf
 data/raw/*.geojsonseq
 server.log
+data/voice
+.site-auth.json

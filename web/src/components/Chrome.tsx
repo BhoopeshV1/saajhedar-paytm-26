@@ -71,12 +71,54 @@ export function BottomNav() {
       <span className="rail-only">{tab("home" as Screen)}</span>
       {TABS.slice(0, 2).map(tab)}
       <button className={`talk talk-${voice}`} onClick={toggleVoice} aria-label={voice === "off" ? "Talk to Saajhedar" : "Stop listening"}>
+        {voice !== "off" && <span className="talk-soap" aria-hidden="true"><i className="b-rim" /></span>}
         <Orb size={68} interactive />
-        <span className="talk-glyph">{voice === "off" ? <IconMic /> : null}</span>
+        <span className="talk-glyph">{voice === "off" ? <IconMic /> : voice === "thinking" ? null : <MicBars />}</span>
       </button>
       {TABS.slice(2).map(tab)}
       <span className="rail-only">{tab("rules" as Screen)}{tab("area" as Screen)}</span>
     </nav>
+  );
+}
+
+// Live sound level inside the talk button: bars that rise with the voice, and lie
+// flat when the microphone hears nothing, so a dead mic is obvious at a glance.
+const BAR_GAIN = [0.5, 0.8, 1, 0.8, 0.5];
+function MicBars() {
+  const { levelRef } = useApp();
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let raf = 0; const held = BAR_GAIN.map(() => 0);
+    const tick = () => {
+      const bars = box.current?.children, level = Math.min(1, levelRef.current * 1.6), now = performance.now();
+      if (bars) for (let i = 0; i < held.length; i++) {
+        const want = level * BAR_GAIN[i] * (0.75 + 0.25 * Math.sin(now / 90 + i * 1.9));
+        held[i] += (want - held[i]) * (want > held[i] ? 0.5 : 0.14);       // quick up, slow down
+        (bars[i] as HTMLElement).style.height = `${5 + held[i] * 31}px`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [levelRef]);
+  return <span className="mic-bars" ref={box}>{BAR_GAIN.map((_, i) => <i key={i} />)}</span>;
+}
+
+// What is waiting for the owner's PIN, shown at the top of each job screen.
+// Nothing opens by itself: the owner reads it, then taps Approve.
+export function Waiting() {
+  const { state, lang, openPin } = useApp();
+  const list = state?.pending ?? [];
+  if (!list.length) return null;
+  const L = (en: string, ta: string, hi: string) => lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en;
+  return (
+    <section className="waiting" aria-label={t("needsPin", lang)}>
+      <h2 className="waiting-title"><IconLock size={15} />{list.length === 1 ? L("1 thing is waiting for your PIN", "1 விஷயம் உங்கள் PIN-க்காகக் காத்திருக்கிறது", "1 काम आपके PIN का इंतज़ार कर रहा है") : L(`${list.length} things are waiting for your PIN`, `${list.length} விஷயங்கள் உங்கள் PIN-க்காகக் காத்திருக்கின்றன`, `${list.length} काम आपके PIN का इंतज़ार कर रहे हैं`)}</h2>
+      {list.map((p) => <div key={p.id} className="waiting-row">
+        <div><p className="waiting-what">{p.summary}</p><p className="waiting-why">{p.reason}</p></div>
+        <button className="waiting-go" onClick={() => openPin(p)}>{L("Approve", "ஒப்புதல்", "मंज़ूर करें")}</button>
+      </div>)}
+    </section>
   );
 }
 
@@ -124,11 +166,12 @@ export function PinSheet() {
         <div className={`pin-dots ${bad ? "shake" : ""}`}>{[0, 1, 2, 3].map((i) => <span key={i} className={`pin-dot ${digits.length > i ? "on" : ""}`} />)}</div>
         <div className="keypad">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((d) => <button key={d} className="key" onClick={() => press(d)} disabled={working}>{d}</button>)}
-          <button className="key key-text" onClick={decline}>{t("decline", lang)}</button>
+          <button className="key key-text" onClick={closePin}>{t("decline", lang)}</button>
           <button className="key" onClick={() => press("0")} disabled={working}>0</button>
           <button className="key key-text" onClick={() => setDigits((x) => x.slice(0, -1))} aria-label="Delete">⌫</button>
         </div>
         <p className="pin-note">Demo PIN: 1234</p>
+        <button className="pin-refuse" onClick={decline}>{lang === "ta-IN" ? "இதைச் செய்ய வேண்டாம்" : lang === "hi-IN" ? "यह मत करो" : "Don't do this"}</button>
       </div>
     </div>
   );
