@@ -177,6 +177,7 @@ Bun.serve({
       if (p === "/api/calls/webhook" && m === "POST") return json(ops.callWebhook(await req.json()));
       if (p === "/api/onboard" && m === "POST") { const r = ops.onboard(await req.json() as any); refreshWeather(); return json(r); }
       if (p === "/api/area/kinds") return json(area.openableKinds());
+      if (p === "/api/area/branch") return json(area.branchSpots(url.searchParams.get("kind") || "grocery", num(url.searchParams.get("lat")), num(url.searchParams.get("lon"))));
       if (p === "/api/area/fit") return json(area.fit(num(url.searchParams.get("lat")), num(url.searchParams.get("lon")), num(url.searchParams.get("r"), 800), url.searchParams.get("kind") || null, num(url.searchParams.get("budget"), 0) || null));
 
       // The bill book, and keeping another billing app in step with it.

@@ -295,8 +295,8 @@ export function Area() {
   // Start at the shop; follow the assistant when it looks a place up.
   useEffect(() => { if (!center && shop && !(focus?.lat && focus?.lon)) setCenter(shop); }, [shop?.lat, shop?.lon]); // eslint-disable-line
   useEffect(() => {
-    if (focus?.lat && focus?.lon) { setCenter({ lat: focus.lat, lon: focus.lon }); if (focus.radius_m) setRadius(RADII.reduce((a, b) => (Math.abs(b - focus.radius_m) < Math.abs(a - focus.radius_m) ? b : a))); setOnly(onPlan(focus) ? plan!.kind : null); }
-  }, [focus?.lat, focus?.lon, focus?.radius_m]);
+    if (focus?.lat && focus?.lon) { setCenter({ lat: focus.lat, lon: focus.lon }); if (focus.radius_m) setRadius(RADII.reduce((a, b) => (Math.abs(b - focus.radius_m) < Math.abs(a - focus.radius_m) ? b : a))); setOnly(focus.kind ?? (onPlan(focus) ? plan!.kind : null)); }
+  }, [focus?.lat, focus?.lon, focus?.radius_m, focus?.kind]);
 
   useEffect(() => {
     if (!center) return;

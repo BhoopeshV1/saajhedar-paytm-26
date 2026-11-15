@@ -36,11 +36,11 @@ The story has three acts, and the first is the hero: **start** a shop knowing th
 
 ### Act 3. Grow with the same knowledge (about half a minute)
 
-**2:08 Three ways to grow.** Open Area view. "A year on, the shop works and Selvam wants more. The data that helped him start now answers three new questions."
+**2:08 Three ways to grow.** Go Home and tap "Grow my shop". "A year on, the shop works and Selvam wants more. The data that helped him start now answers three new questions." Tap through the three tabs as you say them.
 
-- "**A second branch.** The same shop in another area: search any locality and see where a grocery is still missing." Type another locality in the search box.
-- "**A bigger shop.** What his own street is short of, so he knows which shelf to add."
-- "**A different shop.** Where local demand is unmet, he can open something else entirely."
+- "**A second branch.** The same shop in another area: busy places nearby with fewer groceries than usual." Tap the first row; the map opens on that area with its groceries marked.
+- "**A bigger shop.** What is sold thinly around his own shop, so he knows which shelf to add."
+- "**A different shop.** What his neighbourhood is short of, with what each costs to open."
 
 "Every one of those is the same question he asked on day one, asked again with a merchant's track record behind it."
 
@@ -71,7 +71,7 @@ The story has three acts, and the first is the hero: **start** a shop knowing th
 
 ## What to say if asked
 
-- **Is the growth part built?** The Area view answers all three questions today for any place in Chennai. There is no separate "expand my shop" screen yet, and it does not yet use the shop's own sales to size a second branch.
+- **Is the growth part built?** Yes: "Grow my shop" on Home answers all three from the same area data, and one tap asks the AI to compare them. It does not yet use the shop's own sales to size a second branch.
 - **Is the analysis AI?** The counts and the comparison with similar areas are plain code on open map data. The AI adds the judgment: which option, why, and what to watch out for.
 - **What does "similar areas" mean?** Areas with about as many businesses listed nearby. It does not yet account for income, rents or footfall.
 - **How complete is the data?** Open map listings miss small shops with no online presence, so counts are a guide, not a census.

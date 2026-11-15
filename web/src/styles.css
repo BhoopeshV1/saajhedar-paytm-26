@@ -544,6 +544,22 @@ section > .card + .card, section > .gaps + .fine { margin-top: 10px; }
 .mic-bars i { display: block; width: 5px; height: 5px; border-radius: 3px; background: linear-gradient(180deg, #F2FBFF, #8FDFFF); box-shadow: 0 0 6px rgba(143, 223, 255, .7); }
 .mic-bars i:nth-child(odd) { background: linear-gradient(180deg, #D6F3FF, #5CCBF7); }
 
+/* Grow my shop: the Home entry and its sheet */
+.grow-card { display: flex; align-items: center; gap: 12px; padding: 16px 14px; border-radius: var(--r-card); text-align: left; color: #fff;
+  background: linear-gradient(110deg, #002970 0%, #0B57C9 60%, #00BAF2 100%); box-shadow: 0 12px 26px -14px rgba(0, 41, 112, .7); }
+.grow-card .row-title { color: #fff; } .grow-card .row-detail { color: #D6ECFF; }
+.grow-icon { flex: none; width: 48px; height: 48px; border-radius: 16px; background: rgba(255,255,255,.16); display: grid; place-items: center; }
+.grow-sheet { display: flex; flex-direction: column; gap: 14px; }
+.grow-sheet > * { flex-shrink: 0; }
+.grow-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.grow-seg { display: flex; background: #EEF4FA; box-shadow: none; }
+.grow-seg .seg-btn { flex: 1; padding: 8px 6px; font-size: 13px; }
+.grow-list { display: flex; flex-direction: column; min-height: 236px; }
+.grow-lead { font-size: 13.5px; color: var(--muted); line-height: 1.4; margin-bottom: 4px; }
+.grow-row { display: grid; grid-template-columns: 1fr auto; gap: 7px 10px; align-items: center; padding: 12px 0; text-align: left; }
+.grow-row + .grow-row { border-top: 1px solid var(--line); }
+.grow-row .meter, .grow-row .opt-n { grid-column: 1 / -1; }
+
 /* Waiting for the PIN: a notice on the job screens, opened by the owner */
 .waiting { margin: 0 16px 6px; background: #FFF7E3; border: 1px solid #F2D58C; border-radius: 18px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .waiting-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; color: #7A4B00; }

@@ -3,6 +3,7 @@ import { inr, type Screen } from "../api";
 import { t, ago, type Key } from "../i18n";
 import { IconChevron, IconCheck, JOB_ICON } from "../icons";
 import { Outlook } from "./Outlook";
+import { GrowCard } from "./Grow";
 
 export function Home() {
   const { state, lang, go, setFocus, openPin } = useApp();
@@ -81,6 +82,8 @@ export function Home() {
           );
         })}
       </section>
+
+      <GrowCard />
 
       <section className="pair">
         <button className="wide" onClick={() => go("area")}>
