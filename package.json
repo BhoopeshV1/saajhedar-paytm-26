@@ -1,6 +1,7 @@
 {
   "name": "thunai",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "type": "module",
   "description": "Saajhedar - a voice-first business partner for the neighbourhood shop. Hackathon prototype.",

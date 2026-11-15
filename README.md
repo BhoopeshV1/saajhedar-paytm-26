@@ -89,4 +89,8 @@ Listings miss small shops without an online presence, so counts are a guide, not
 - The microphone has not been tested in a real, noisy shop.
 - The Paytm and UPI marks in the wallpapers are outlines made from their logos for this hackathon demo; they belong to their owners.
 
+## Licence
+
+The code is under the MIT License (`LICENSE`). The area data, coastlines, and the names and marks of others are not; see `NOTICE.md`.
+
 See `PITCH.md` for the three-minute demo script.
