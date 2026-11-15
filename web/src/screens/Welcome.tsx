@@ -246,7 +246,7 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
               <div className="vs-peer"><b>{Math.round(c.expected)}</b><span>{L("in similar areas", "இதுபோன்ற பகுதிகளில்", "ऐसे इलाकों में")}</span></div>
             </div>
             {c.nearest_m != null && <span className="verdict-near">{L(`Nearest one is ${c.nearest_m} m away`, `அருகிலுள்ளது ${c.nearest_m} மீ தொலைவில்`, `सबसे पास वाली ${c.nearest_m} मी दूर`)}</span>}
-            {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "short"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
+            {cost(c) && <span className={`verdict-money ${c.within_budget ? "" : "verdict-money-over"}`}>{c.within_budget ? L(`${lakh(budget)} covers it`, `${lakh(budget)} போதும்`, `${lakh(budget)} काफ़ी है`) : L(`Needs ${cost(c)}`, `தேவை ${cost(c)}`, `चाहिए ${cost(c)}`)}</span>}
           </div>
         ) : (
           <div className="verdict">
