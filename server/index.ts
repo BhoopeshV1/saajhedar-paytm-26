@@ -180,7 +180,13 @@ Bun.serve({
         const bytes = await callVoice(url.searchParams.get("who") || "", url.searchParams.get("text") || "");
         return bytes ? new Response(bytes as unknown as BodyInit, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=86400" } }) : json({ error: "No voice for this line." }, 404);
       }
-      if (p === "/api/calls/webhook" && m === "POST") return json(ops.callWebhook(await req.json()));
+      if (p === "/api/calls/webhook" && m === "POST") {
+        // Keep each report exactly as it arrived, so the real payload shape can be read.
+        const raw = await req.text();
+        try { fs.appendFileSync(path.join(import.meta.dir, "..", "data", "call-webhook.log"), `${new Date().toISOString()} ${raw.slice(0, 20000)}\n`); } catch {}
+        let body: any = {}; try { body = JSON.parse(raw); } catch {}
+        return json(ops.callWebhook(body));
+      }
       if (p === "/api/onboard" && m === "POST") { const r = ops.onboard(await req.json() as any); refreshWeather(); return json(r); }
       if (p === "/api/area/kinds") return json(area.openableKinds());
       if (p === "/api/area/branch") return json(area.branchSpots(url.searchParams.get("kind") || "grocery", num(url.searchParams.get("lat")), num(url.searchParams.get("lon"))));

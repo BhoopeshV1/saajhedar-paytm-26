@@ -8,3 +8,4 @@ data/raw/*.geojsonseq
 server.log
 data/voice
 .site-auth.json
+data/call-webhook.log

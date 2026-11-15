@@ -7,7 +7,7 @@ import path from "node:path";
 import { timingSafeEqual } from "node:crypto";
 
 const FILE = path.join(import.meta.dir, "..", ".site-auth.json");
-const creds: { user: string; hash: string } | null = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, "utf8")) : null;
+const creds: { user: string; hash: string; hook_key?: string } | null = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, "utf8")) : null;
 const OPEN_HOST = /^(localhost|127\.0\.0\.1|\[::1\]|[a-z0-9-]+\.[a-z0-9-]+\.ts\.net)(:\d+)?$/i;
 
 const MAX_FAILS = 5;                 // wrong passwords allowed per address
@@ -25,6 +25,13 @@ const slow = (secs: number) => new Response("Too many wrong attempts. Try again 
 export async function gate(req: Request, peer: string | undefined): Promise<Response | null> {
   if (OPEN_HOST.test(req.headers.get("host") || "")) return null;
   if (!creds) return new Response("This address is not set up.", { status: 503 });
+  // The voice-agent platform cannot log in. Its call reports come to one address,
+  // POST only, carrying a separate key that opens nothing else.
+  const url = new URL(req.url);
+  if (creds.hook_key && req.method === "POST" && url.pathname === "/api/calls/webhook") {
+    const key = url.searchParams.get("key") || req.headers.get("x-hook-key") || "";
+    return same(key, Buffer.from(creds.hook_key)) ? null : new Response("Wrong key.", { status: 403 });
+  }
   // Behind Caddy the visitor's address is in X-Forwarded-For; trust it only from this machine.
   const local = !peer || peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
   const ip = (local && req.headers.get("x-forwarded-for")?.split(",")[0].trim()) || peer || "unknown";
