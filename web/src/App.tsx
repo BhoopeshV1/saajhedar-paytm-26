@@ -6,7 +6,6 @@ import { Sell, Stock, Pay, Collect, Rules } from "./screens/Jobs";
 import { Area } from "./screens/Area";
 import { Welcome, Splash } from "./screens/Welcome";
 
-const seen = () => { try { return localStorage.getItem("thunai_setup") != null; } catch { return true; } };
 
 // Laptop screens only: switch between the wide layout and a phone-width one.
 function LayoutToggle() {
@@ -28,11 +27,10 @@ function LayoutToggle() {
 }
 
 // Laptop screens only: the team's badge, tucked into the corner of the wallpaper.
-// It peeks in, opens once to show the team name, and shows the members on hover.
+// Always open: the team name with both members.
 function TeamBadge() {
-  const [open, setOpen] = useState(false);
   return (
-    <button className={`team-badge ${open ? "is-open" : ""}`} onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Team Finance Tours: Bhoopesh and Mirudhula">
+    <button className="team-badge is-open" aria-label="Team Finance Tours: Bhoopesh and Mirudhula">
       <span className="tb-mascot" aria-hidden="true">
         <svg viewBox="0 0 48 48" width="44" height="44">
           <defs><radialGradient id="tbFace" cx="38%" cy="30%" r="80%"><stop offset="0" stopColor="#B9F0FF" /><stop offset=".55" stopColor="#22BDF2" /><stop offset="1" stopColor="#0B63C9" /></radialGradient></defs>
@@ -55,14 +53,15 @@ function TeamBadge() {
 function Shell() {
   const { screen } = useApp();
   const [menu, setMenu] = useState(false);
-  const [welcome, setWelcome] = useState(() => !seen());
+  // Every visit starts at the welcome page with its three doors, behind the splash.
+  const [welcome, setWelcome] = useState(true);
   const [splash, setSplash] = useState(true);
   useEffect(() => { const on = () => { setMenu(false); setWelcome(true); }; window.addEventListener("thunai:welcome", on); return () => window.removeEventListener("thunai:welcome", on); }, []);
   // Every arrival starts at the splash: a fresh load, a page the browser brought
   // back from memory, a tab reopened after ten minutes away, and a demo reset.
   useEffect(() => {
     let hiddenAt = 0;
-    const show = () => { setMenu(false); setSplash(true); };
+    const show = () => { setMenu(false); setSplash(true); setWelcome(true); };
     const back = (e: PageTransitionEvent) => { if (e.persisted) show(); };
     const vis = () => { if (document.hidden) hiddenAt = Date.now(); else if (hiddenAt && Date.now() - hiddenAt > 10 * 60_000) show(); };
     window.addEventListener("thunai:splash", show); window.addEventListener("pageshow", back); document.addEventListener("visibilitychange", vis);

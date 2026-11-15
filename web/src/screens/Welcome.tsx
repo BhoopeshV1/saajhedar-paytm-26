@@ -9,6 +9,7 @@ import { api, inr, type AreaHit, type Fit, type FitKind, type KindLite, type Lan
 import { IconCheck, IconChevron } from "../icons";
 import { handoff, lakh, askFor } from "../plan";
 import { StartKit } from "./StartKit";
+import { growIntent } from "./Grow";
 
 type Step = "start" | "phone" | "otp" | "shop" | "books" | "pin" | "fence" | "kind" | "money" | "fit";
 // Kinds of shop, grouped for the two-pane picker: groups down the left, shops on the right.
@@ -183,14 +184,18 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
       <h1 className="brand">Saajhedar</h1>
       <p className="brand-sub">{L("Your shop's partner, by voice.", "குரலால் இயங்கும் உங்கள் கடையின் துணை.", "बोलकर चलने वाला, आपकी दुकान का साथी।")}</p>
       <button className="door" onClick={() => { setFresh(false); setStep("phone"); }}>
-        <span className="door-title">{L("I run a shop", "எனக்கு ஒரு கடை இருக்கிறது", "मेरी दुकान है")}</span><IconChevron />
+        <span className="door-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10v10h16V10M3 10l1.5-6h15L21 10a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0zM10 20v-5h4v5" /></svg></span><span className="door-title">{L("I run a shop", "எனக்கு ஒரு கடை இருக்கிறது", "मेरी दुकान है")}</span><IconChevron />
         <span className="door-text">{L("Set up in two minutes.", "இரண்டு நிமிடத்தில் தொடங்குங்கள்.", "दो मिनट में शुरू करें।")}</span>
       </button>
       <button className="door door-fence" onClick={() => setStep("fence")}>
-        <span className="door-title">{L("Thinking of opening one?", "கடை தொடங்க யோசனையா?", "दुकान खोलने की सोच रहे हैं?")}</span><IconChevron />
+        <span className="door-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s-6.5-5.6-6.5-10.5a6.500 6.500 0 0 1 13 0C18.500 15.400 12 21 12 21z" /><circle cx="12" cy="10.500" r="2.300" /></svg></span><span className="door-title">{L("Thinking of opening one?", "கடை தொடங்க யோசனையா?", "दुकान खोलने की सोच रहे हैं?")}</span><IconChevron />
         <span className="door-text">{L("See who is already there, and what the area is missing.", "அங்கே யார் இருக்கிறார்கள், எது குறைவு என்று பாருங்கள்.", "देखिए वहाँ कौन है और क्या कम है।")}</span>
       </button>
-      <button className="link" onClick={() => onDone("demo")}>{L("Skip to the demo shop", "மாதிரிக் கடைக்குச் செல்", "डेमो दुकान देखें")}</button>
+      <button className="door door-grow" onClick={() => { growIntent.open = true; onDone("demo"); go("home"); }}>
+        <span className="door-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21v-9M12 12c0-3.500-2.500-6-7-6 0 4 2.500 6.500 7 6zM12 15c0-3 2.200-5.500 7-5.500 0 3.800-2.500 5.500-7 5.500z" /></svg></span><span className="door-title">{L("Grow your business", "உங்கள் தொழிலை வளர்க்க", "अपना कारोबार बढ़ाएँ")}</span><IconChevron />
+        <span className="door-text">{L("A second branch, more on the shelf, or a different shop.", "இரண்டாவது கிளை, கூடுதல் பொருட்கள், அல்லது வேறு கடை.", "दूसरी शाखा, और सामान, या अलग दुकान।")}</span>
+      </button>
+      <button className="link" onClick={() => { go("home"); onDone("demo"); }}>{L("Skip to the demo shop", "மாதிரிக் கடைக்குச் செல்", "डेमो दुकान देखें")}</button>
       <p className="fine">{L("Not a Paytm product. Payments and loans are simulated.", "இது Paytm தயாரிப்பு அல்ல. பணம், கடன் அனைத்தும் மாதிரி.", "यह Paytm का उत्पाद नहीं है। भुगतान और लोन नकली हैं।")}</p>
     </div>
   );

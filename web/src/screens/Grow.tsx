@@ -17,9 +17,13 @@ const Sprout = ({ size = 28 }: { size?: number }) => (
 );
 const Spark = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.900 5.600a3 3 0 0 0 1.900 1.900L21.400 11.400l-5.600 1.900a3 3 0 0 0-1.900 1.900L12 20.800l-1.900-5.600a3 3 0 0 0-1.900-1.900L2.600 11.400l5.600-1.900a3 3 0 0 0 1.900-1.900z" /></svg>;
 
+// Set by the welcome page's "Grow your business" door, so the sheet is open on arrival.
+export const growIntent = { open: false };
+
 export function GrowCard() {
   const { lang } = useApp();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => growIntent.open);
+  useEffect(() => { growIntent.open = false; }, []);
   const L = (en: string, ta: string, hi: string) => lang === "ta-IN" ? ta : lang === "hi-IN" ? hi : en;
   return (
     <>
