@@ -270,9 +270,6 @@ export function Welcome({ onDone }: { onDone: (how: string) => void }) {
             <div key={o.key} className="opt"><i style={{ background: o.color }} /><span className="row-title">{kn(o)}</span>{cost(o) && <span className="opt-cost">{cost(o)}</span>}
               <span className="meter" aria-hidden="true"><b style={{ width: `${Math.min(100, (o.here / usual) * 100)}%`, background: o.color }} /></span>
               <span className="opt-n">{L(`${o.here} here, ${usual} in similar areas`, `இங்கே ${o.here}, இதுபோன்ற பகுதிகளில் ${usual}`, `यहाँ ${o.here}, ऐसे इलाकों में ${usual}`)}</span></div>); })}</section>}
-        {fit.peers.length > 0 && <section className="card"><h2 className="card-title">{L(`Compared with ${fit.peer_count} similar areas`, `${fit.peer_count} ஒத்த பகுதிகளுடன் ஒப்பீடு`, `${fit.peer_count} मिलते-जुलते इलाकों से तुलना`)}</h2>
-          <p className="fine">{L("Similar means about as many businesses listed nearby as here. Their usual mix shows what an area this busy tends to have.", "ஒத்த பகுதி என்றால், இங்குள்ள அளவுக்கு அருகில் வணிகங்கள் உள்ள பகுதி. அவற்றின் வழக்கமான கலவை, இவ்வளவு பரபரப்பான பகுதியில் என்ன இருக்கும் என்று காட்டுகிறது.", "मिलता-जुलता यानी आसपास लगभग उतने ही कारोबार। उनका आम मेल बताता है कि इतने व्यस्त इलाके में क्या होता है।")}</p>
-          <div className="tags">{fit.peers.map((n) => <span key={n} className="tag tag-plain">{n}</span>)}</div></section>}
         {fit.anchors.length > 0 && <section className="card"><h2 className="card-title">{L("Who comes here", "யார் வருகிறார்கள்", "यहाँ कौन आता है")}</h2>
           <div className="tags">{fit.anchors.slice(0, 5).map((a) => <span key={a.key} className="tag">{ANCHOR[a.key] ?? a.key}<b>{a.n}</b></span>)}</div></section>}
         <details className="about"><summary>{L("About these numbers", "இந்த எண்களைப் பற்றி", "इन आँकड़ों के बारे में")}</summary>
