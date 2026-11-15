@@ -544,6 +544,30 @@ export function importDocs(docs: BillDoc[], source: string) {
   return { source, bills, skipped, sales: sales.invoices ? { invoices: sales.invoices, lines: sales.lines, value: sales.value, days: sales.days.size, not_stocked: [...sales.unmatched].slice(0, 12) } : null };
 }
 
+// ---------- Suppliers ----------
+// Add a supplier, or change one's details. A supplier added here is new to the
+// shop, so the first payment to them still needs the PIN.
+export function saveSupplier(input: { id?: number; name?: string; contact?: string; phone?: string; supplies?: string; lead_days?: number }) {
+  const name = String(input.name ?? "").trim().replace(/\s+/g, " ").slice(0, 60);
+  const phone = String(input.phone ?? "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+  if (name.length < 2) throw new OpError("Give the supplier's name.");
+  if (!/^[6-9]\d{9}$/.test(phone)) throw new OpError("Give a ten-digit mobile number for the supplier.");
+  const contact = String(input.contact ?? "").trim().slice(0, 40), supplies = String(input.supplies ?? "").trim().slice(0, 80);
+  const lead = Math.max(0, Math.min(7, Math.round(Number(input.lead_days ?? 1)) || 0));
+  const clash = get("SELECT id FROM suppliers WHERE lower(name) = lower(?) AND id != ?", name, input.id ?? 0);
+  if (clash) throw new OpError(`${name} is already in your suppliers.`);
+  let id = Number(input.id) || 0;
+  if (id) {
+    if (!get("SELECT id FROM suppliers WHERE id = ?", id)) throw new OpError("Unknown supplier.");
+    run("UPDATE suppliers SET name = ?, contact = ?, phone = ?, supplies = ?, lead_days = ? WHERE id = ?", name, contact, phone, supplies, lead, id);
+  } else {
+    id = Number(run("INSERT INTO suppliers (name,supplies,trusted,lead_days,contact,phone) VALUES (?,?,0,?,?,?)", name, supplies, lead, contact, phone).lastInsertRowid);
+    log("pay", `Added supplier ${name}`, `${contact ? `${contact}, ` : ""}${phone}`, "owner");
+  }
+  emit({ type: "refresh" });
+  return get("SELECT * FROM suppliers WHERE id = ?", id);
+}
+
 // ---------- Ordering by phone ----------
 // Saajhedar rings each supplier and places the restock order. Whether a call may
 // be made unasked, and what may be agreed on it, is decided here in code:

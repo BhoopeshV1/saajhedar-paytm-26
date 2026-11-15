@@ -21,7 +21,9 @@ export function migrate() {
   CREATE TABLE IF NOT EXISTS suppliers (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL, supplies TEXT NOT NULL,
     trusted INTEGER NOT NULL DEFAULT 1,  -- 0 = new supplier, never paid before
-    lead_days INTEGER NOT NULL DEFAULT 1
+    lead_days INTEGER NOT NULL DEFAULT 1,
+    contact TEXT NOT NULL DEFAULT '',     -- the person to ask for
+    phone TEXT NOT NULL DEFAULT ''        -- ten digits
   );
   CREATE TABLE IF NOT EXISTS items (
     id INTEGER PRIMARY KEY, sku TEXT UNIQUE NOT NULL,
@@ -130,6 +132,8 @@ export function migrate() {
   `);
   // Databases made before real calls existed lack this column.
   try { db.exec("ALTER TABLE calls ADD COLUMN attempt_id TEXT"); } catch {}
+  try { db.exec("ALTER TABLE suppliers ADD COLUMN contact TEXT NOT NULL DEFAULT ''"); } catch {}
+  try { db.exec("ALTER TABLE suppliers ADD COLUMN phone TEXT NOT NULL DEFAULT ''"); } catch {}
 }
 
 export const nowIso = () => new Date().toISOString();

@@ -41,7 +41,9 @@ export type Activity = { id: number; at: string; job: string; text: string; deta
 export type Customer = { id: number; name: string; phone: string; street: string; usual: { sku: string; qty: number }[] };
 export type LoanOffer = { eligible: boolean; reason?: string; amount?: number; fee?: number; days?: number; daily_repay?: number; shortfall?: number; basis?: string; note?: string };
 
+export type Supplier = { id: number; name: string; supplies: string; trusted: number; lead_days: number; contact?: string; phone?: string };
 export type State = {
+  suppliers?: Supplier[];
   overview: { shop: { name: string; owner: string; locality: string; lat: number; lon: number; cash: number; language: Lang }; date: string;
     sell: { waiting: number; packing: number; ready: number; yesterday_sales: number };
     stock: { urgent: number; this_week: number; festival: { name: string; name_ta: string; name_hi: string; in_days: number } | null; weather: string };
@@ -107,6 +109,7 @@ export const api = {
   areaBranch: (kind: string, lat: number, lon: number) => req<BranchSpot[]>(`/api/area/branch?kind=${kind}&lat=${lat}&lon=${lon}`),
   areaFit: (lat: number, lon: number, r: number, kind: string | null, budget: number | null) => req<Fit>(`/api/area/fit?lat=${lat}&lon=${lon}&r=${r}${kind ? `&kind=${kind}` : ""}${budget ? `&budget=${budget}` : ""}`),
   onboard: (body: Record<string, unknown>) => post<{ ok: boolean }>("/api/onboard", body),
+  saveSupplier: (s: { id?: number; name: string; contact: string; phone: string; supplies: string; lead_days: number }) => post<Supplier>("/api/suppliers", s),
   callSuppliers: () => post<{ called: { call_id: number; supplier: string; total: number; summary: string }[]; needs_pin: { supplier: string; total: number; why: string }[]; real?: { supplier: string }; real_error?: string }>("/api/calls", {}),
   cancelBill: (id: number) => post(`/api/bills/counter/${id}/cancel`),
   syncConnect: (body: { url?: string; demo?: boolean }) => post<{ name: string }>("/api/billing/sync/connect", body),

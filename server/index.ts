@@ -204,6 +204,7 @@ Bun.serve({
       if ((mm = p.match(/^\/api\/rules\/(\d+)\/remove$/)) && m === "POST") return json(ops.proposeRuleRemoval(Number(mm[1])));
       if (p === "/api/reset" && m === "POST") { seed(true); resetSessions(); sync.demoReset(); ops.autopilot(); return json({ ok: true }); }
 
+      if (p === "/api/suppliers" && m === "POST") return json(ops.saveSupplier(await req.json().catch(() => ({})) as any));
       if (p === "/api/calls" && m === "POST") {
         // When real calls are set up, the first supplier inside the rule is also rung for real, on the test number.
         const live = outboundReady() && !!process.env.CALL_TEST_NUMBER;

@@ -4,6 +4,7 @@ import { useApp } from "../store";
 import { api, inr, qty, type Bill, type Order } from "../api";
 import { t, nameOf, ago, reasonText } from "../i18n";
 import { Outlook } from "./Outlook";
+import { Suppliers } from "./Suppliers";
 import { AddBill } from "./AddBill";
 import { BillBook } from "./BillBook";
 import { RulesFor } from "./RulesFor";
@@ -211,6 +212,7 @@ export function Pay() {
       )}
 
       <AddBill />
+      <Suppliers />
 
       <h2 className="section">{t("billsToPay", lang)}</h2>
       {state.bills.map((b) => <BillCard key={b.id} b={b} />)}
