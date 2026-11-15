@@ -8,3 +8,8 @@ data/raw/*.geojsonseq
 server.log
 data/voice
 .site-auth.json
+
+# Agent skills installed locally, not part of the project
+.agents/
+.claude/
+skills-lock.json

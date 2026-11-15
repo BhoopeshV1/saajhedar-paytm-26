@@ -96,6 +96,9 @@ export class VoiceEngine {
       }
       this.resetCapture();
       this.frames = 0; this.peak = 0;
+      // The noise floor survived stop()/start(), so once it had ratcheted up past
+      // speech the only cure was a page reload. Re-measure the room each session.
+      this.noise = 0.004;
       this.set("listening");
       this.watchMic();
     } catch (err: any) {
@@ -175,7 +178,10 @@ export class VoiceEngine {
     let o = 0; for (const c of chunks) { pcm.set(c, o); o += c.length; }
     this.set("thinking");
     this.h.onLevel(0);
-    this.h.onUtterance(encodeWav(downsample(pcm, rate, TARGET_RATE), TARGET_RATE), len / rate);
+    // downsample() refuses to upsample, so the header must state the rate the
+    // samples are actually at, not the rate we asked for.
+    const outRate = Math.min(rate, TARGET_RATE);
+    this.h.onUtterance(encodeWav(downsample(pcm, rate, outRate), outRate), len / rate);
   }
 
   // ----- playback -----
@@ -207,7 +213,7 @@ export class VoiceEngine {
     src.buffer = buf; src.connect(this.outAnalyser!);
     src.onended = () => { if (this.playing === src) { this.playing = null; this.playNext(); } };
     this.playing = src;
-    if (this.state !== "off" || true) this.set("speaking");
+    if (this.state !== "off") this.set("speaking");
     src.start();
     this.pumpOutLevel();
   }
@@ -244,7 +250,9 @@ export class VoiceEngine {
     if (this.state === "hearing" || this.state === "listening") return;
     this.resetCapture(); this.set("listening");
   }
-  setThinking() { this.set("thinking"); }
+  // A server-pushed event must not yank the engine out from under someone who
+  // is already mid-sentence; their words would be dropped with no trace.
+  setThinking() { if (this.state !== "hearing") this.set("thinking"); }
 
   // One-off sound outside a conversation (a new-order announcement).
   async playOnce(b64: string) {
@@ -256,7 +264,7 @@ export class VoiceEngine {
 }
 
 function downsample(input: Float32Array, from: number, to: number): Float32Array {
-  if (from === to) return input;
+  if (from <= to) return input;   // never upsample: a Bluetooth headset can run below 16 kHz
   const ratio = from / to; const out = new Float32Array(Math.floor(input.length / ratio));
   for (let i = 0; i < out.length; i++) {
     const start = Math.floor(i * ratio), end = Math.min(input.length, Math.floor((i + 1) * ratio));

@@ -71,7 +71,7 @@ export type AreaHit = { label: string; ta?: string; type: "locality" | "street";
 
 export type TurnEvent =
   | { type: "heard"; text: string; lang: Lang }
-  | { type: "empty" }
+  | { type: "empty"; message?: string }
   | { type: "tool"; name: string; screen?: Screen; focus?: Record<string, any>; ok: boolean }
   | { type: "say"; text: string; lang: Lang }
   | { type: "audio"; seq: number; last: boolean; b64: string; mime: string }
@@ -149,7 +149,18 @@ export async function turn(input: { audio?: Blob; text?: string; event?: string;
     let nl: number;
     while ((nl = buf.indexOf("\n")) >= 0) {
       const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
-      if (line) { try { onEvent(JSON.parse(line)); } catch {} }
+      if (!line) continue;
+      // A dropped line used to vanish without trace, which is how a broken turn
+      // came to look like "nothing happened". Report both failure modes.
+      let ev: TurnEvent | null = null;
+      try { ev = JSON.parse(line) as TurnEvent; }
+      catch { console.warn("[turn] unreadable line from server:", line.slice(0, 200)); }
+      if (!ev) continue;
+      try { onEvent(ev); }
+      catch (err) {
+        console.error("[turn] handler threw on event", ev.type, err);
+        onEvent({ type: "error", message: "The app could not handle the assistant's reply.", detail: String((err as Error)?.message).slice(0, 300) } as TurnEvent);
+      }
     }
   }
 }

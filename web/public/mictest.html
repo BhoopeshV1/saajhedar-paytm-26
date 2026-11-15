@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mic Diagnostic</title>
+<style>
+  :root { --bg:#faf9f7; --fg:#1a1a1a; --mut:#6b6b6b; --ok:#0a7d37; --bad:#c62828; --warn:#b26a00; --line:#e3e0db; --card:#fff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#15151a; --fg:#f0efec; --mut:#9a978f; --ok:#4ade80; --bad:#f87171; --warn:#fbbf24; --line:#2e2e36; --card:#1d1d24; } }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px; background:var(--bg); color:var(--fg);
+         font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .wrap { max-width:720px; margin:0 auto; }
+  h1 { font-size:21px; margin:0 0 4px; }
+  .sub { color:var(--mut); margin:0 0 20px; font-size:14px; }
+  button { font:inherit; font-weight:600; padding:13px 22px; border-radius:10px; border:0;
+           background:var(--fg); color:var(--bg); cursor:pointer; }
+  button:disabled { opacity:.45; cursor:default; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:14px 0; }
+  .card h2 { font-size:13px; text-transform:uppercase; letter-spacing:.07em; color:var(--mut); margin:0 0 10px; }
+  .row { display:flex; justify-content:space-between; gap:14px; padding:5px 0; border-bottom:1px solid var(--line); font-size:14px; }
+  .row:last-child { border-bottom:0; }
+  .row span:first-child { color:var(--mut); }
+  .row span:last-child { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; text-align:right; word-break:break-word; }
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .meter { height:26px; border-radius:7px; background:var(--line); overflow:hidden; margin:10px 0 6px; position:relative; }
+  .fill { height:100%; width:0%; background:var(--ok); transition:width .05s linear; }
+  .mark { position:absolute; top:0; bottom:0; width:2px; background:var(--bad); }
+  .verdict { font-size:15px; font-weight:600; padding:13px 15px; border-radius:10px; margin-top:14px; }
+  .v-ok { background:rgba(10,125,55,.12); color:var(--ok); }
+  .v-bad { background:rgba(198,40,40,.12); color:var(--bad); }
+  .v-warn { background:rgba(178,106,0,.12); color:var(--warn); }
+  .hint { font-size:13px; color:var(--mut); margin-top:7px; }
+  ol { margin:6px 0 0; padding-left:20px; } li { margin:4px 0; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Microphone diagnostic</h1>
+  <p class="sub">Runs the same capture path as the app (getUserMedia &rarr; AudioWorklet &rarr; RMS &rarr; VAD) and shows every number.</p>
+
+  <button id="go">Start 12-second test</button>
+
+  <div class="card"><h2>Environment</h2><div id="env"></div></div>
+  <div class="card"><h2>Input devices</h2><div id="devs"><div class="row"><span>status</span><span class="mut">press start</span></div></div></div>
+  <div class="card"><h2>Captured track</h2><div id="track"><div class="row"><span>status</span><span>press start</span></div></div></div>
+  <div class="card">
+    <h2>Live level</h2>
+    <div class="meter"><div class="fill" id="fill"></div><div class="mark" id="mark"></div></div>
+    <div id="live"></div>
+    <p class="hint">The red line is the app's speech threshold. Your voice must push the bar past it.</p>
+  </div>
+  <div id="verdict"></div>
+</div>
+
+<script>
+// Mirrors web/src/voice.ts exactly.
+var START_MS = 140, END_MS = 950, MIN_MS = 380, FLOOR = 0.01, NOISE_MULT = 3;
+
+var $ = function (id) { return document.getElementById(id); };
+function row(label, value, cls) {
+  return '<div class="row"><span>' + label + '</span><span class="' + (cls || '') + '">' + value + '</span></div>';
+}
+function esc(s) { return String(s).replace(/[<>&]/g, function (c) { return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c]; }); }
+
+$('env').innerHTML =
+  row('secure context', isSecureContext ? 'yes' : 'NO', isSecureContext ? 'ok' : 'bad') +
+  row('getUserMedia', navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 'available' : 'MISSING',
+      navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? 'ok' : 'bad') +
+  row('AudioWorklet', (window.AudioContext || window.webkitAudioContext) && (window.AudioContext || window.webkitAudioContext).prototype.audioWorklet !== undefined ? 'supported' : 'check', '') +
+  row('origin', esc(location.origin), '') +
+  row('user agent', esc(navigator.userAgent.slice(0, 72)), '');
+
+var WORKLET = 'class Tap extends AudioWorkletProcessor{process(inputs){const ch=inputs[0]&&inputs[0][0];if(ch)this.port.postMessage(ch.slice(0));return true}}registerProcessor("tap",Tap);';
+
+$('go').onclick = async function () {
+  var btn = $('go');
+  btn.disabled = true;
+  btn.textContent = 'Testing…';
+  $('verdict').innerHTML = '';
+
+  var frames = 0, peak = 0, sum = 0, n = 0, noise = 0.008, aboveMs = 0, longestRun = 0, curRun = 0, wouldTrigger = false;
+
+  try {
+    // 1. Enumerate devices.
+    try {
+      var list = await navigator.mediaDevices.enumerateDevices();
+      var ins = list.filter(function (d) { return d.kind === 'audioinput'; });
+      $('devs').innerHTML = ins.length
+        ? ins.map(function (d, i) { return row('input ' + (i + 1), esc(d.label || '(label hidden until permission granted)'), ''); }).join('')
+        : row('audio inputs', 'NONE FOUND', 'bad');
+    } catch (e) { $('devs').innerHTML = row('error', esc(e.message), 'bad'); }
+
+    // 2. Open the mic with the app's exact constraints.
+    var stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+    });
+
+    var track = stream.getAudioTracks()[0];
+    var st = track.getSettings ? track.getSettings() : {};
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = new AC({ latencyHint: 'interactive' });
+    if (ctx.state !== 'running') await ctx.resume();
+
+    $('track').innerHTML =
+      row('device', esc(track.label || '(no label)'), track.label ? '' : 'warn') +
+      row('enabled', track.enabled ? 'yes' : 'NO', track.enabled ? 'ok' : 'bad') +
+      row('muted (OS)', track.muted ? 'YES — muted!' : 'no', track.muted ? 'bad' : 'ok') +
+      row('readyState', esc(track.readyState), track.readyState === 'live' ? 'ok' : 'bad') +
+      row('echoCancellation', String(st.echoCancellation), '') +
+      row('noiseSuppression', String(st.noiseSuppression), '') +
+      row('autoGainControl', String(st.autoGainControl), '') +
+      row('track sampleRate', String(st.sampleRate || '(n/a)'), '') +
+      row('AudioContext rate', ctx.sampleRate + ' Hz', '') +
+      row('ctx state', esc(ctx.state), ctx.state === 'running' ? 'ok' : 'bad');
+
+    // 3. Install the worklet, wired to the destination through a silent gain.
+    var url = URL.createObjectURL(new Blob([WORKLET], { type: 'application/javascript' }));
+    await ctx.audioWorklet.addModule(url);
+    URL.revokeObjectURL(url);
+
+    var src = ctx.createMediaStreamSource(stream);
+    var node = new AudioWorkletNode(ctx, 'tap', { numberOfInputs: 1, numberOfOutputs: 1 });
+    src.connect(node);
+    var mute = ctx.createGain(); mute.gain.value = 0;
+    node.connect(mute); mute.connect(ctx.destination);
+
+    var threshold = Math.max(FLOOR, noise * NOISE_MULT);
+    $('mark').style.left = Math.min(100, threshold * 900) + '%';
+
+    node.port.onmessage = function (e) {
+      var f = e.data;
+      frames++;
+      var s = 0;
+      for (var i = 0; i < f.length; i++) s += f[i] * f[i];
+      var rms = Math.sqrt(s / f.length);
+      var ms = (f.length / ctx.sampleRate) * 1000;
+
+      if (rms > peak) peak = rms;
+      sum += rms; n++;
+
+      threshold = Math.max(FLOOR, noise * NOISE_MULT);
+      var loud = rms > threshold;
+      if (!loud) noise = noise * 0.96 + rms * 0.04;
+
+      if (loud) { curRun += ms; if (curRun > longestRun) longestRun = curRun; if (curRun >= START_MS) wouldTrigger = true; }
+      else curRun = 0;
+
+      $('fill').style.width = Math.min(100, rms * 900) + '%';
+      $('mark').style.left = Math.min(100, threshold * 900) + '%';
+      $('live').innerHTML =
+        row('frames received', String(frames), frames > 0 ? 'ok' : 'bad') +
+        row('current RMS', rms.toFixed(5), '') +
+        row('peak RMS', peak.toFixed(5), '') +
+        row('speech threshold', threshold.toFixed(5), '') +
+        row('noise floor', noise.toFixed(5), '') +
+        row('longest loud run', Math.round(longestRun) + ' ms (need ' + START_MS + ')', longestRun >= START_MS ? 'ok' : 'warn');
+    };
+
+    // 4. Run for 12 seconds.
+    await new Promise(function (r) { setTimeout(r, 12000); });
+
+    stream.getTracks().forEach(function (t) { t.stop(); });
+    try { ctx.close(); } catch (e) {}
+
+    // 5. Verdict.
+    var avg = n ? sum / n : 0;
+    var v = '';
+    if (frames === 0) {
+      v = '<div class="verdict v-bad">FAIL &mdash; no audio frames arrived.<br>' +
+          'The AudioWorklet is not delivering any audio on this machine. This is a capture-path failure, not a volume problem.</div>';
+    } else if (peak < 0.003) {
+      v = '<div class="verdict v-bad">FAIL &mdash; frames arrive but the signal is near-silent (peak ' + peak.toFixed(5) + ').<br>' +
+          'The wrong input device is probably selected, or it is muted in Windows.</div>' +
+          '<div class="card"><h2>Try</h2><ol>' +
+          '<li>Windows Settings &rarr; System &rarr; Sound &rarr; Input &mdash; pick the right mic and raise the volume.</li>' +
+          '<li>Check the mic is not hardware-muted (a key or a switch on the laptop).</li>' +
+          '<li>In the browser address bar, open the mic icon and select a different input device.</li></ol></div>';
+    } else if (!wouldTrigger) {
+      v = '<div class="verdict v-warn">AUDIO IS FINE, BUT THE APP WOULD NEVER TRIGGER.<br>' +
+          'Peak ' + peak.toFixed(5) + ' vs threshold ' + threshold.toFixed(5) + ', longest loud run ' + Math.round(longestRun) + 'ms (needs ' + START_MS + 'ms).<br>' +
+          'The voice detector is set too high for this microphone. This is the bug.</div>';
+    } else {
+      v = '<div class="verdict v-ok">PASS &mdash; capture works and the app\'s detector would trigger.<br>' +
+          'Peak ' + peak.toFixed(5) + ', avg ' + avg.toFixed(5) + ', threshold ' + threshold.toFixed(5) + ', longest run ' + Math.round(longestRun) + 'ms.<br>' +
+          'The fault is further down the pipeline, not in mic capture.</div>';
+    }
+    $('verdict').innerHTML = v +
+      '<div class="card"><h2>Copy these to Claude</h2>' +
+      row('frames', String(frames), '') + row('peak RMS', peak.toFixed(5), '') +
+      row('avg RMS', avg.toFixed(5), '') + row('final threshold', threshold.toFixed(5), '') +
+      row('longest loud run', Math.round(longestRun) + ' ms', '') +
+      row('would trigger', wouldTrigger ? 'yes' : 'NO', wouldTrigger ? 'ok' : 'bad') +
+      row('ctx rate', ctx.sampleRate + ' Hz', '') + '</div>';
+
+  } catch (err) {
+    $('verdict').innerHTML = '<div class="verdict v-bad">ERROR: ' + esc(err && (err.name + ' — ' + err.message)) + '</div>';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Run again';
+};
+</script>
+</body>
+</html>
