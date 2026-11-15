@@ -72,7 +72,7 @@ On screens 960px and wider the app is drawn inside a device frame, scaled to fit
 
 ## Public demo and login
 
-For a public address the app sits behind a reverse proxy, and `server/gate.ts` asks for a username and password (HTTP Basic) on any host that is not localhost or a tailnet name. The password hash is read from `app/.site-auth.json` (`{"user", "hash"}`, bcrypt, not in git). Five wrong passwords from one address in ten minutes lock that address out for fifteen minutes. Everyone with the login shares one shop and spends the same API credits.
+For a public address the app sits behind a reverse proxy, and `server/gate.ts` asks for a username and password (HTTP Basic) on any host that is not localhost or a tailnet name. The password hash is read from `app/.site-auth.json` (`{"user", "hash"}`, bcrypt, not in git). Five wrong passwords from one address in ten minutes lock that address out for fifteen minutes. Everyone with the login shares one shop and spends the same API credits. `SITE_OPEN=1` in `.env` switches the login off for a public demo: anyone with the address can then use the shop, spend the API credits and trigger the real supplier call. The call-report webhook still needs its key.
 
 ## Area data
 

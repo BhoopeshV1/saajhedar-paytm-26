@@ -32,6 +32,9 @@ export async function gate(req: Request, peer: string | undefined): Promise<Resp
     const key = url.searchParams.get("key") || req.headers.get("x-hook-key") || "";
     return same(key, Buffer.from(creds.hook_key)) ? null : new Response("Wrong key.", { status: 403 });
   }
+  // SITE_OPEN=1 in .env lets everyone in without the password, for a public demo.
+  // The call-report address above still needs its key. Remove the line to lock the site again.
+  if (process.env.SITE_OPEN === "1") return null;
   // Behind Caddy the visitor's address is in X-Forwarded-For; trust it only from this machine.
   const local = !peer || peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1";
   const ip = (local && req.headers.get("x-forwarded-for")?.split(",")[0].trim()) || peer || "unknown";
