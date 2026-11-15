@@ -8,7 +8,7 @@ import { CallScreen } from "./CallScreen";
 const Phone = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" /></svg>;
 
 export function PhoneOrders() {
-  const { state, lang, act, toast, go, setFocus } = useApp();
+  const { state, lang, act, toast, go, setFocus, health } = useApp();
   const [open, setOpen] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [queue, setQueue] = useState<number[]>([]);
@@ -18,6 +18,9 @@ export function PhoneOrders() {
     setBusy(true);
     const r = await act(() => api.callSuppliers());
     setBusy(false);
+    // A real phone is ringing: do not play the on-screen call over it.
+    if (r?.real) { toast({ title: L(`Ringing ${r.real.supplier} now`, `${r.real.supplier}-ஐ இப்போது அழைக்கிறது`, `${r.real.supplier} को अभी फ़ोन लग रहा है`), body: L("A real phone call. Pick up to hear Saajhedar order.", "உண்மையான அழைப்பு. எடுத்துக் கேளுங்கள்.", "असली कॉल। उठाकर सुनिए।"), tone: "good" }); return; }
+    if (r?.real_error) toast({ title: L("The real call did not go through", "உண்மையான அழைப்பு செல்லவில்லை", "असली कॉल नहीं लगी"), body: r.real_error, tone: "info" });
     if (r?.called.length) setQueue(r.called.map((c) => c.call_id));
     if (r && !r.called.length) toast({ title: r.called.length ? `${L("Called", "அழைத்தது", "फ़ोन किया")}: ${r.called.map((c) => c.supplier).join(", ")}` : L("No call was made", "அழைப்பு இல்லை", "कोई कॉल नहीं हुई"),
       body: r.needs_pin.length ? `${L("Needs your PIN", "உங்கள் PIN தேவை", "आपका PIN चाहिए")}: ${r.needs_pin.map((n) => `${n.supplier} ${inr(n.total)}`).join(", ")}` : undefined, tone: "good" });
@@ -53,7 +56,8 @@ export function PhoneOrders() {
           ))}
         </ul>
       )}
-      <p className="fine">{L("Prototype: the supplier's side of the call is simulated, and no phone rings.", "முன்மாதிரி: சப்ளையர் பக்கம் மாதிரியாக உருவாக்கப்பட்டது; எந்த போனும் ஒலிக்காது.", "प्रोटोटाइप: सप्लायर की तरफ़ की बातचीत नकली है, कोई फ़ोन नहीं बजता।")}</p>
+      <p className="fine">{health?.real_calls ? L("Prototype: the first supplier inside your rule gets a real phone call, to a test number. The order and invoice shown here are still simulated.", "முன்மாதிரி: முதல் சப்ளையருக்கு சோதனை எண்ணில் உண்மையான அழைப்பு செல்லும். இங்கே காட்டும் ஆர்டரும் பில்லும் மாதிரியே.", "प्रोटोटाइप: पहले सप्लायर को टेस्ट नंबर पर असली कॉल जाती है। यहाँ दिखा ऑर्डर और बिल अभी नकली हैं।")
+        : L("Prototype: the supplier's side of the call is simulated, and no phone rings.", "முன்மாதிரி: சப்ளையர் பக்கம் மாதிரியாக உருவாக்கப்பட்டது; எந்த போனும் ஒலிக்காது.", "प्रोटोटाइप: सप्लायर की तरफ़ की बातचीत नकली है, कोई फ़ोन नहीं बजता।")}</p>
       {playing && <CallScreen call={playing} more={queue.length - 1} onNext={() => setQueue((q) => q.slice(1))} onClose={() => setQueue([])} onInvoice={toPay} />}
     </section>
   );
