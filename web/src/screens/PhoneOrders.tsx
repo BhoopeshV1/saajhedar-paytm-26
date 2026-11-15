@@ -19,7 +19,7 @@ export function PhoneOrders() {
     const r = await act(() => api.callSuppliers());
     setBusy(false);
     // A real phone is ringing: do not play the on-screen call over it.
-    if (r?.real) { toast({ title: L(`Ringing ${r.real.supplier} now`, `${r.real.supplier}-ஐ இப்போது அழைக்கிறது`, `${r.real.supplier} को अभी फ़ोन लग रहा है`), body: L("A real phone call. Pick up to hear Saajhedar order.", "உண்மையான அழைப்பு. எடுத்துக் கேளுங்கள்.", "असली कॉल। उठाकर सुनिए।"), tone: "good" }); return; }
+    if (r?.real) { toast({ title: L(`Ringing ${r.real.supplier} now`, `${r.real.supplier}-ஐ இப்போது அழைக்கிறது`, `${r.real.supplier} को अभी फ़ोन लग रहा है`), body: L("A real phone call. The order appears here when it ends.", "உண்மையான அழைப்பு. எடுத்துக் கேளுங்கள்.", "असली कॉल। उठाकर सुनिए।"), tone: "good" }); return; }
     if (r?.real_error) toast({ title: L("The real call did not go through", "உண்மையான அழைப்பு செல்லவில்லை", "असली कॉल नहीं लगी"), body: r.real_error, tone: "info" });
     if (r?.called.length) setQueue(r.called.map((c) => c.call_id));
     if (r && !r.called.length) toast({ title: r.called.length ? `${L("Called", "அழைத்தது", "फ़ोन किया")}: ${r.called.map((c) => c.supplier).join(", ")}` : L("No call was made", "அழைப்பு இல்லை", "कोई कॉल नहीं हुई"),
@@ -46,7 +46,7 @@ export function PhoneOrders() {
               {open === c.id && (
                 <div className="call-body">
                   {c.transcript.map((t, i) => <p key={i} className={`turn turn-${t.who}`}><b>{t.who === "saajhedar" ? "Saajhedar" : c.supplier}</b>{t.text}</p>)}
-                  {c.lines.filter((l) => !l.agreed).map((l) => <p key={l.name} className="warn-line">{l.name}: {inr(l.rate)} a {l.unit} is more than 5% up. Not ordered; yours to decide.</p>)}
+                  {c.status !== "on the call" && c.lines.filter((l) => !l.agreed).map((l) => <p key={l.name} className="warn-line">{l.name}: {l.qty === 0 ? "not agreed on the call. Not ordered; yours to decide." : `${inr(l.rate)} a ${l.unit} is more than 5% up. Not ordered; yours to decide.`}</p>)}
                   {c.lines.filter((l) => l.agreed && l.qty < l.asked).map((l) => <p key={l.name} className="fine">{l.name}: asked for {qty(l.asked)}, supplier had {qty(l.qty)} {l.unit}.</p>)}
                 </div>
               )}
@@ -56,7 +56,7 @@ export function PhoneOrders() {
           ))}
         </ul>
       )}
-      <p className="fine">{health?.real_calls ? L("Prototype: the first supplier inside your rule gets a real phone call, to a test number. The order and invoice shown here are still simulated.", "முன்மாதிரி: முதல் சப்ளையருக்கு சோதனை எண்ணில் உண்மையான அழைப்பு செல்லும். இங்கே காட்டும் ஆர்டரும் பில்லும் மாதிரியே.", "प्रोटोटाइप: पहले सप्लायर को टेस्ट नंबर पर असली कॉल जाती है। यहाँ दिखा ऑर्डर और बिल अभी नकली हैं।")
+      <p className="fine">{health?.real_calls ? L("Prototype: the first supplier inside your rule gets a real phone call, to a test number. Its order and invoice are written when the call ends, from what was agreed. Other suppliers' calls are simulated.", "முன்மாதிரி: முதல் சப்ளையருக்கு சோதனை எண்ணில் உண்மையான அழைப்பு செல்லும். அழைப்பு முடிந்ததும் ஒப்புக்கொண்டபடி ஆர்டரும் பில்லும் பதிவாகும். மற்ற அழைப்புகள் மாதிரியே.", "प्रोटोटाइप: पहले सप्लायर को टेस्ट नंबर पर असली कॉल जाती है। कॉल खत्म होने पर जो तय हुआ उसी से ऑर्डर और बिल बनते हैं। बाकी कॉल नकली हैं।")
         : L("Prototype: the supplier's side of the call is simulated, and no phone rings.", "முன்மாதிரி: சப்ளையர் பக்கம் மாதிரியாக உருவாக்கப்பட்டது; எந்த போனும் ஒலிக்காது.", "प्रोटोटाइप: सप्लायर की तरफ़ की बातचीत नकली है, कोई फ़ोन नहीं बजता।")}</p>
       {playing && <CallScreen call={playing} more={queue.length - 1} onNext={() => setQueue((q) => q.slice(1))} onClose={() => setQueue([])} onInvoice={toPay} />}
     </section>

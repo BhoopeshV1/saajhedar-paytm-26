@@ -3,7 +3,7 @@
 import { all, get, run, log, nowIso, today, addDays, daysBetween, db } from "./db";
 import { restockPlan, standingOrderHealth, upcomingFestival, outlook } from "./forecast";
 import { currentWeather } from "./weather";
-import { writeReminders, writeCall, type Debtor } from "./writer";
+import { writeReminders, writeCall, readCall, type Debtor } from "./writer";
 import type { BillDoc } from "./billing";
 import { judgeOrder, judgePayment, judgeCredit, validateRule, activeRules, trippedGuards, RULE_KINDS, type RuleKind } from "./rules";
 import { emit } from "./bus";
@@ -570,19 +570,18 @@ export function callSuppliers(input: { scope?: "urgent" | "all_suggested"; real?
   const called: any[] = [], needs_pin: any[] = [];
   // With real calls switched on, the first supplier inside the rule gets a real
   // phone call, kept to three items so the call stays short.
-  let real_brief: { supplier: string; shop: string; owner: string; items: string; total: string } | null = null;
-  for (const [sid, all_ls] of bySupplier) {
-    let ls = all_ls;
-    const total = Math.round(ls.reduce((s, l) => s + l.qty * l.cost, 0));
-    const v = judgeOrder(sid, ls[0].supplier, total);
-    if (v.decision === "allow" && input.real && !real_brief) {
-      ls = ls.slice(0, 3);
-      const s = shop();
-      real_brief = { supplier: ls[0].supplier, shop: String(s.name), owner: String(s.owner ?? ""), total: String(Math.round(ls.reduce((a, l) => a + l.qty * l.cost, 0))),
-        items: ls.map((l) => `${l.qty} ${l.unit} ${l.name} at ${l.cost} rupees per ${l.unit}`).join("; ") };
-    }
-    if (v.decision === "allow") called.push(phoneCall(sid, ls, `Rule #${v.rule.id}`));
-    else needs_pin.push({ supplier: ls[0].supplier, total, why: v.why, pending_id: addPending("phone_order", { supplier_id: sid, lines: ls }, `Call ${ls[0].supplier} and order ${inr(total)}`, v.why) });
+  let real_brief: { supplier: string; shop: string; owner: string; items: string; total: string; call_id?: number } | null = null;
+  const judged = [...bySupplier].map(([sid, ls]) => ({ sid, ls, total: Math.round(ls.reduce((s, l) => s + l.qty * l.cost, 0)) })).map((j) => ({ ...j, v: judgeOrder(j.sid, j.ls[0].supplier, j.total) }));
+  // The real call goes to the supplier inside the rule with the most items, so it is worth listening to.
+  const realSid = input.real ? judged.filter((j) => j.v.decision === "allow").sort((x, y) => Math.min(3, y.ls.length) - Math.min(3, x.ls.length))[0]?.sid : undefined;
+  for (const { sid, ls: all_ls, total, v } of judged) {
+    if (v.decision !== "allow") { needs_pin.push({ supplier: all_ls[0].supplier, total, why: v.why, pending_id: addPending("phone_order", { supplier_id: sid, lines: all_ls }, `Call ${all_ls[0].supplier} and order ${inr(total)}`, v.why) }); continue; }
+    if (sid !== realSid) { called.push(phoneCall(sid, all_ls, `Rule #${v.rule.id}`)); continue; }
+    const ls = all_ls.slice(0, 3), s = shop();
+    const c = realCallStart(sid, ls, `Rule #${v.rule.id}`);
+    real_brief = { supplier: ls[0].supplier, shop: String(s.name), owner: String(s.owner ?? ""), total: String(Math.round(ls.reduce((a, l) => a + l.qty * l.cost, 0))), call_id: c.call_id,
+      items: ls.map((l) => `${l.qty} ${l.unit} ${l.name} at ${l.cost} rupees per ${l.unit}`).join("; ") };
+    called.push(c);
   }
   emit({ type: "refresh" });
   return { called, needs_pin, real_brief, note: "The supplier's side of each call is simulated in this prototype. Invoices from the calls are in Pay; pay after the delivery is counted." };
@@ -641,17 +640,79 @@ export function phoneCall(supplierId: number, lines: OrderLine[], via: string) {
   return { call_id: id, supplier: sup.name, status: agreed.length ? "ordered" : "nothing agreed", total, summary, bill_id: billId, left_for_owner: left.map((l) => ({ item: l.name, new_rate: l.rate, was: l.cost })), simulated: true };
 }
 
-// What Sarvam's voice agent platform posts after a real call. The shape is not
-// verified against a live campaign, so the event is kept whole and read loosely.
-export function callWebhook(body: any) {
-  const text = Array.isArray(body?.transcript) ? body.transcript.map((t: any) => ({ who: /agent|assistant|bot/i.test(t.role ?? t.speaker ?? "") ? "saajhedar" : "supplier", text: String(t.text ?? t.content ?? "") }))
-    : body?.transcript ? [{ who: "supplier", text: String(body.transcript).slice(0, 4000) }] : [];
-  const vars = body?.variables ?? body?.agent_variables ?? {};
-  const name = String(vars.supplier ?? body?.contact?.name ?? "Supplier").slice(0, 60);
-  const id = Number(run("INSERT INTO calls (at,supplier,mode,status,via,transcript,summary) VALUES (?,?,?,?,?,?,?)", nowIso(), name, "sarvam", String(body?.outcome ?? body?.status ?? "received").slice(0, 40), "Sarvam voice agent",
-    JSON.stringify(text), String(vars.summary ?? "").slice(0, 300)).lastInsertRowid);
+// ---------- A real call ----------
+// With Sarvam's voice agents set up, the first supplier inside the rule is rung
+// for real. The call is recorded as "on the call" at once; the order and the
+// invoice are written only when the agent's report arrives, from what the
+// supplier actually agreed to.
+export function realCallStart(supplierId: number, lines: OrderLine[], via: string) {
+  const sup = get("SELECT * FROM suppliers WHERE id = ?", supplierId);
+  if (!sup) throw new OpError("Unknown supplier.");
+  const id = Number(run("INSERT INTO calls (at,supplier_id,supplier,mode,status,via,lines,summary) VALUES (?,?,?,?,?,?,?,?)", nowIso(), supplierId, sup.name, "sarvam", "on the call", via,
+    JSON.stringify(lines.map((l) => ({ sku: l.sku, name: l.name, unit: l.unit, asked: l.qty, qty: 0, rate: l.cost, cost: l.cost, agreed: false }))), "A real phone call is in progress. The order will appear here when it ends.").lastInsertRowid);
   emit({ type: "refresh" });
-  return { ok: true, call_id: id };
+  return { call_id: id, supplier: sup.name, status: "on the call", total: 0, summary: "", real: true };
+}
+export const realCallAttach = (callId: number, attemptId: string) => { run("UPDATE calls SET attempt_id = ? WHERE id = ?", attemptId, callId); };
+// The real call could not be placed: fall back to the simulated call so the order still happens.
+export function realCallFailed(callId: number) {
+  const c = get("SELECT * FROM calls WHERE id = ?", callId);
+  if (!c) return null;
+  run("DELETE FROM calls WHERE id = ?", callId);
+  const lines: OrderLine[] = JSON.parse(c.lines).map((l: any) => ({ sku: l.sku, name: l.name, qty: l.asked, unit: l.unit, cost: l.cost, supplier_id: c.supplier_id, supplier: c.supplier }));
+  return phoneCall(Number(c.supplier_id), lines, c.via);
+}
+
+// What Sarvam's voice agent posts when a call ends: attempt_id, status,
+// interaction_transcript [{role, en_text, indic_text}] and the agent's variables
+// (order_status, delivery_day, order_notes, call_summary).
+export async function callWebhook(body: any) {
+  const turns: { who: "saajhedar" | "supplier"; text: string }[] = (Array.isArray(body?.interaction_transcript) ? body.interaction_transcript : Array.isArray(body?.transcript) ? body.transcript : [])
+    .map((t: any) => ({ who: /agent|assistant|bot/i.test(t.role ?? "") ? "saajhedar" as const : "supplier" as const, text: String(t.indic_text ?? t.en_text ?? t.text ?? "").slice(0, 600) })).filter((t: any) => t.text);
+  const english = (Array.isArray(body?.interaction_transcript) ? body.interaction_transcript : []).map((t: any) => ({ who: /agent/i.test(t.role ?? "") ? "saajhedar" : "supplier", text: String(t.en_text ?? t.indic_text ?? "") }));
+  const vars = body?.final_agent_variables ?? body?.output_agent_variables ?? {};
+  const call = body?.attempt_id ? get("SELECT * FROM calls WHERE attempt_id = ?", String(body.attempt_id)) : null;
+  if (!call) {
+    // A report for a call this shop did not start (or one from before a reset): keep it as a record only.
+    const id = Number(run("INSERT INTO calls (at,supplier,mode,status,via,transcript,summary) VALUES (?,?,?,?,?,?,?)", nowIso(), String(vars.supplier ?? body?.contact?.name ?? "Supplier").slice(0, 60), "sarvam", "report only", "Sarvam voice agent",
+      JSON.stringify(turns), String(vars.call_summary ?? "").slice(0, 300)).lastInsertRowid);
+    emit({ type: "refresh" });
+    return { ok: true, call_id: id, matched: false };
+  }
+  if (call.status !== "on the call") return { ok: true, call_id: call.id, matched: true, already: true };
+  const asked: any[] = JSON.parse(call.lines);
+  const finish = (status: string, summary: string, lines = asked, total = 0, orderId: number | null = null, billId: number | null = null) => {
+    run("UPDATE calls SET status = ?, summary = ?, lines = ?, total = ?, transcript = ?, order_id = ?, bill_id = ? WHERE id = ?", status, summary.slice(0, 400), JSON.stringify(lines), total, JSON.stringify(turns), orderId, billId, call.id);
+    emit({ type: "refresh" });
+    return { ok: true, call_id: call.id, matched: true, status };
+  };
+  if (body?.status !== "connected" || !turns.length) return finish("not answered", `${call.supplier} did not pick up${body?.failure_reason ? ` (${String(body.failure_reason).slice(0, 80)})` : ""}. Nothing was ordered.`);
+  const read = await readCall(asked.map((l) => ({ name: l.name, qty: l.asked, unit: l.unit, cost: l.cost })), english.length ? english : turns);
+  if (!read) return finish("needs a look", `${String(vars.call_summary ?? "The call ended.")} Nothing was ordered automatically; read the call and decide.`);
+  // Code decides what counts: never more than was asked, never a price more than 5% up.
+  const answered = asked.map((l) => {
+    const r = read.find((x) => x.name.trim().toLowerCase() === String(l.name).toLowerCase());
+    const qty = Math.max(0, Math.min(Number(l.asked), Math.floor(Number(r?.qty) || 0)));
+    const rate = Number(r?.rate) > 0 ? Math.round(Number(r!.rate) * 100) / 100 : l.cost;
+    const rise = rate / l.cost - 1;
+    return { ...l, qty, rate, rise, agreed: qty > 0 && rise <= PRICE_TOLERANCE };
+  });
+  const agreed = answered.filter((l) => l.agreed), dear = answered.filter((l) => l.qty > 0 && !l.agreed);
+  const total = Math.round(agreed.reduce((s, l) => s + l.qty * l.rate, 0));
+  const sup = get("SELECT * FROM suppliers WHERE id = ?", call.supplier_id);
+  let orderId: number | null = null, billId: number | null = null;
+  if (agreed.length && sup) {
+    orderId = Number(run("INSERT INTO supplier_orders (supplier_id,lines,total,status,created_at) VALUES (?,?,?,?,?)", sup.id, JSON.stringify(agreed.map((l) => ({ sku: l.sku, name: l.name, qty: l.qty, unit: l.unit, cost: l.rate }))), total, "confirmed by phone", nowIso()).lastInsertRowid);
+    billId = importPurchase({ type: "purchase", party: sup.name, ref: `${sup.name.replace(/[^A-Za-z]/g, "").slice(0, 3).toUpperCase()}-P${Date.now().toString().slice(-5)}`, date: today(),
+      lines: agreed.map((l) => ({ name: l.name, qty: l.qty, unit: l.unit, rate: l.rate })), total }, "phone order", { beforeDelivery: true, dueIn: Math.max(1, sup.lead_days) }).bill_id;
+  }
+  const short = agreed.filter((l) => l.qty < l.asked);
+  const summary = `${agreed.length} of ${asked.length} items ordered for ${inr(total)}`
+    + (short.length ? `, ${short.map((l) => `${String(l.name).toLowerCase()} only ${l.qty} of ${l.asked} ${l.unit}`).join(", ")}` : "")
+    + (dear.length ? `, ${dear.map((l) => String(l.name).toLowerCase()).join(", ")} left for you (price up ${Math.round(dear[0].rise * 100)}%)` : "")
+    + (vars.delivery_day ? `. Delivery: ${String(vars.delivery_day).slice(0, 60)}` : "");
+  log("stock", `Called ${call.supplier} and ${agreed.length ? "placed an order" : "nothing was agreed"}`, `${summary}. Real phone call. ${call.via}`, String(call.via).startsWith("Rule") ? "rule" : "owner");
+  return finish(agreed.length ? "ordered" : "nothing agreed", summary, answered.map(({ rise, ...l }) => l), total, orderId, billId);
 }
 const callsView = () => all("SELECT * FROM calls ORDER BY id DESC LIMIT 8").map((c) => ({ ...c, lines: JSON.parse(c.lines), transcript: JSON.parse(c.transcript) }));
 

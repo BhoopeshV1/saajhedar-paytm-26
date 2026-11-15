@@ -49,6 +49,23 @@ Write one message per person in ${LANG_NAME[l]}, the way a courteous shopkeeper 
 // Rewrites the wording of a supplier call so it sounds like two people on the
 // phone in the shop's language. The facts (items, quantities, prices) are fixed
 // by the caller; a rewrite that drops a turn is thrown away.
+// Reads what a supplier agreed to on a real call, line by line. The model only
+// reports what was said; whether a line may be ordered is decided in code.
+export async function readCall(asked: { name: string; qty: number; unit: string; cost: number }[], transcript: { who: string; text: string }[]):
+  Promise<{ name: string; qty: number; rate: number }[] | null> {
+  if (!claudeReady()) return null;
+  try {
+    const out = await structured<{ lines: { name: string; qty: number; rate: number }[] }>({
+      system: `You read the transcript of a phone call in which a shop's ordering assistant ("saajhedar") asked a supplier for some items. For each item asked for, report what the supplier clearly agreed to supply: the quantity and the price per unit. Use quantity 0 when the item was never discussed, was refused, was left for the owner, or the supplier's answer is unclear or was only "will check later". When the supplier agreed without naming a different price, use the usual price given. Return one entry per item asked, with the item's name exactly as given.`,
+      content: JSON.stringify({ asked: asked.map((l) => ({ name: l.name, quantity: l.qty, unit: l.unit, usual_price: l.cost })), transcript }),
+      tool: { name: "read_call", description: "What the supplier agreed to, one entry per item asked.", input_schema: { type: "object", additionalProperties: false, required: ["lines"],
+        properties: { lines: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "qty", "rate"], properties: { name: { type: "string" }, qty: { type: "number" }, rate: { type: "number" } } } } } } },
+      maxTokens: 800,
+    });
+    return Array.isArray(out.lines) ? out.lines : null;
+  } catch { return null; }
+}
+
 export async function writeCall(turns: { who: string; text: string }[], lang: string, supplier: string): Promise<{ who: string; text: string }[] | null> {
   if (!claudeReady()) return null;
   try {

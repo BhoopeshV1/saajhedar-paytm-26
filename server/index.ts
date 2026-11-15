@@ -209,8 +209,14 @@ Bun.serve({
         const live = outboundReady() && !!process.env.CALL_TEST_NUMBER;
         const { real_brief, ...out } = ops.callSuppliers({ ...(await req.json().catch(() => ({})) as any), real: live });
         if (!live || !real_brief) return json(out);
-        try { await placeCall(process.env.CALL_TEST_NUMBER!, real_brief); console.log("[call] real call placed for", real_brief.supplier); return json({ ...out, real: { supplier: real_brief.supplier } }); }
-        catch (err) { console.log("[call] real call failed:", (err as Error).message); return json({ ...out, real_error: (err as Error).message }); }
+        const { call_id, ...brief } = real_brief;
+        try { const placed = await placeCall(process.env.CALL_TEST_NUMBER!, brief); ops.realCallAttach(call_id!, placed.attempt_id); console.log("[call] real call placed for", brief.supplier); return json({ ...out, real: { supplier: brief.supplier } }); }
+        catch (err) {
+          // Could not ring: do that supplier's call the simulated way instead, so the order still happens.
+          console.log("[call] real call failed:", (err as Error).message);
+          const sim = ops.realCallFailed(call_id!);
+          return json({ ...out, called: out.called.map((c: any) => (c.call_id === call_id && sim ? sim : c)), real_error: (err as Error).message });
+        }
       }
       if (p === "/api/calls/voice") {
         const bytes = await callVoice(url.searchParams.get("who") || "", url.searchParams.get("text") || "");
@@ -228,7 +234,7 @@ Bun.serve({
         const raw = await req.text();
         try { fs.appendFileSync(path.join(import.meta.dir, "..", "data", "call-webhook.log"), `${new Date().toISOString()} ${raw.slice(0, 20000)}\n`); } catch {}
         let body: any = {}; try { body = JSON.parse(raw); } catch {}
-        return json(ops.callWebhook(body));
+        return json(await ops.callWebhook(body));
       }
       if (p === "/api/onboard" && m === "POST") { const r = ops.onboard(await req.json() as any); refreshWeather(); return json(r); }
       if (p === "/api/area/kinds") return json(area.openableKinds());

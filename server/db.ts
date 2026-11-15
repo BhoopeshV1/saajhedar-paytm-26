@@ -123,10 +123,13 @@ export function migrate() {
     status TEXT NOT NULL, via TEXT NOT NULL DEFAULT '',
     lines TEXT NOT NULL DEFAULT '[]', total INTEGER NOT NULL DEFAULT 0,
     transcript TEXT NOT NULL DEFAULT '[]', summary TEXT NOT NULL DEFAULT '',
-    order_id INTEGER, bill_id INTEGER
+    order_id INTEGER, bill_id INTEGER,
+    attempt_id TEXT                               -- the voice agent's id for a real call
   );
   CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `);
+  // Databases made before real calls existed lack this column.
+  try { db.exec("ALTER TABLE calls ADD COLUMN attempt_id TEXT"); } catch {}
 }
 
 export const nowIso = () => new Date().toISOString();
